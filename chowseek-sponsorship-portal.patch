@@ -1,0 +1,894 @@
+diff --git a/README.md b/README.md
+index 256b61c..38cccbf 100644
+--- a/README.md
++++ b/README.md
+@@ -1,19 +1,33 @@
+-# Chowseek organization-trial portal
++# Chowseek sponsorship portal
+ 
+-This folder is a static admin site. It can be copied directly to GitHub Pages; there is no application server and no server secret in the browser.
++This folder is a static sponsorship-admin site designed to deploy directly to GitHub Pages. It uses Supabase Auth plus the project **publishable** key in the browser; it never embeds a service-role/secret key.
+ 
+-## Security model
++The portal manages the existing `public.sponsored_results` model documented in `SPONSORED_RESULTS.md`:
+ 
+-- The page signs in with Supabase email + password.
+-- The browser contains only the Chowseek **publishable** Supabase key.
+-- The database keeps portal administrators in `chowseek_private.portal_admins`, which is not exposed through the Data API.
+-- RLS on `public.chowseek_trial_offers` permits CRUD only when `chowseek_private.is_portal_admin()` is true.
+-- Trial-redemption inserts are never granted to browser roles. A confirmed Supabase email is matched by database logic against an active domain or exact-email offer.
+-- There is intentionally **no portal sign-up button**. A normal Chowseek user cannot promote themselves to portal admin.
++- advertiser and optional campaign name
++- sponsored place/business name, address, and description
++- latitude/longitude used by the mobile map viewport query
++- start/end schedule and active switch
++- CPM rate and currency
++- impression count and calculated estimated spend
+ 
+-## One-time admin bootstrap
++Admins can create, edit, activate/pause, and delete unused placements. Once a placement has recorded impressions, the portal keeps it for reporting history instead of deleting it.
+ 
+-Choose the Supabase Auth account that should administer the portal. It must have a password. Then, from the Supabase SQL Editor, add that existing user to the private allowlist:
++## One-time database setup
++
++The sponsored-results migration intentionally keeps normal mobile clients away from direct table access. For a static GitHub Pages admin portal, run `SPONSOR_PORTAL_SETUP.sql` once in the linked Supabase project's SQL Editor.
++
++That setup grants `authenticated` table operations but protects every operation with RLS using the existing private portal-admin check:
++
++```text
++chowseek_private.is_portal_admin()
++```
++
++This is what makes browser-side CRUD safe with the publishable key: possession of the key alone does not grant sponsorship access.
++
++## Admin bootstrap
++
++Use the same private portal-admin allowlist as the trial portal. Choose an existing Supabase Auth account with a password, then add it from the SQL Editor if needed:
+ 
+ ```sql
+ insert into chowseek_private.portal_admins (user_id)
+@@ -23,18 +37,37 @@ where lower(email) = lower('YOUR_ADMIN_EMAIL@example.com')
+ on conflict (user_id) do nothing;
+ ```
+ 
+-If the account previously used only Chowseek magic links, use **Set or reset admin password** on the portal. Add the deployed GitHub Pages URL to **Authentication → URL Configuration → Redirect URLs** first. A typical project-pages pattern is `https://YOUR_GITHUB_USERNAME.github.io/YOUR_REPOSITORY/**`.
++There is intentionally no public sign-up flow in this portal.
+ 
+ ## GitHub Pages
+ 
+-The portal has no build step. Publish this `portal/` directory as the Pages site root, or copy its three files into a repository's `docs/` directory and configure Pages to deploy `docs/` from the desired branch.
++There is no build step. Publish this directory as the Pages site root, or copy its files into a repository `docs/` directory and configure Pages to deploy that directory.
+ 
+ The Supabase client import is pinned to `@supabase/supabase-js@2.95.0` through `esm.sh`.
+ 
+-## Trial behavior
++If password reset is used, add the deployed Pages URL to **Supabase → Authentication → URL Configuration → Redirect URLs**. A project-pages pattern typically looks like:
+ 
+-A domain offer such as `school.edu` applies to confirmed users whose email domain is exactly `school.edu`. An exact-email offer applies only to that full address. The first eligible claim creates a redemption ending one calendar month later. Each Supabase user can redeem one organization trial total. Pausing or expiring an offer stops new claims but does not shorten already-started trials.
++```text
++https://YOUR_GITHUB_USERNAME.github.io/YOUR_REPOSITORY/**
++```
+ 
+-## Recommended Supabase Auth hardening
++## Serving behavior
++
++Creating a placement does not necessarily make it visible in the mobile app. It must satisfy all of the serving rules already described in `SPONSORED_RESULTS.md`:
++
++1. `active = true`
++2. `starts_at` is in the past/current time
++3. `ends_at` is null or still in the future
++4. its coordinates are inside the app's current map viewport
++
++The portal defaults new placements to inactive so an admin can review them before publishing.
++
++## Reporting
++
++The overview and each placement use the table's authoritative cumulative `impression_count`. Estimated spend is calculated as:
++
++```text
++(impression_count / 1000) * (cpm_rate_cents / 100)
++```
+ 
+-Supabase's security advisor currently reports that leaked-password protection is disabled. Enable **Authentication → Password Security → Leaked password protection** before using the portal with a production administrator password.
++For detailed day-by-day reporting, continue to aggregate `public.sponsored_result_impressions.viewed_at` as described in `SPONSORED_RESULTS.md`; this static portal does not request raw impression-audit rows.
+diff --git a/SPONSORED_RESULTS.md b/SPONSORED_RESULTS.md
+index aa48bf3..bed0f22 100644
+--- a/SPONSORED_RESULTS.md
++++ b/SPONSORED_RESULTS.md
+@@ -59,45 +59,11 @@ order by day desc;
+ 
+ ## Portal write pattern
+ 
+-The portal should use a server-side Supabase client with a service-role/secret key or another trusted database role. Do not ship that key to a browser or mobile client. Typical operations are:
++This repository includes a static GitHub Pages admin portal. It continues to use the Supabase publishable key, but `SPONSOR_PORTAL_SETUP.sql` adds admin-only RLS policies for `public.sponsored_results`. Every direct browser read/write is therefore checked by `chowseek_private.is_portal_admin()`; no service-role key is shipped to the browser.
+ 
+-```sql
+--- Create a draft placement. It will not serve until active = true.
+-insert into public.sponsored_results (
+-  advertiser_name,
+-  campaign_name,
+-  name,
+-  address,
+-  description,
+-  latitude,
+-  longitude,
+-  cpm_rate_cents,
+-  currency,
+-  starts_at,
+-  ends_at,
+-  active
+-) values (
+-  'Example Advertiser',
+-  'Fall launch',
+-  'Example Restaurant',
+-  '123 Main St, Los Angeles, CA 90000',
+-  'A short sponsored description. Add a second sentence with the offer or reason to visit.',
+-  34.0522,
+-  -118.2437,
+-  2500,
+-  'USD',
+-  now(),
+-  now() + interval '30 days',
+-  false
+-);
+-
+--- Publish or pause it.
+-update public.sponsored_results
+-set active = true, updated_at = now()
+-where id = '<placement uuid>';
+-```
++The portal creates draft placements with `active = false` by default, supports editing and activation/pausing, and prevents deleting rows after they have recorded impressions. It exposes cumulative `impression_count`, calculated spend, and schedule status without changing the mobile RPC API.
+ 
+-A portal can expose `impression_count`, calculated spend, schedule status, and daily impression history without changing the mobile API.
++If a separate backend-based advertiser workflow is added later, a server-side client with a service-role/secret key is still appropriate for that trusted backend. Never embed a service-role/secret key in the GitHub Pages site or mobile app.
+ 
+ ## Deployment
+ 
+diff --git a/SPONSOR_PORTAL_SETUP.sql b/SPONSOR_PORTAL_SETUP.sql
+new file mode 100644
+index 0000000..04f5414
+--- /dev/null
++++ b/SPONSOR_PORTAL_SETUP.sql
+@@ -0,0 +1,42 @@
++-- Run this once in the linked Chowseek Supabase project's SQL Editor.
++-- It keeps the GitHub Pages portal on the publishable key while allowing only
++-- authenticated users accepted by chowseek_private.is_portal_admin() to manage
++-- public.sponsored_results.
++
++alter table public.sponsored_results enable row level security;
++
++grant select, insert, update, delete on table public.sponsored_results to authenticated;
++
++-- Keep policy names portal-specific so this can coexist with mobile serving
++-- policies/RPCs from the sponsored-results migration.
++drop policy if exists "portal admins can read sponsored results" on public.sponsored_results;
++create policy "portal admins can read sponsored results"
++on public.sponsored_results
++for select
++to authenticated
++using (chowseek_private.is_portal_admin());
++
++drop policy if exists "portal admins can create sponsored results" on public.sponsored_results;
++create policy "portal admins can create sponsored results"
++on public.sponsored_results
++for insert
++to authenticated
++with check (chowseek_private.is_portal_admin());
++
++drop policy if exists "portal admins can update sponsored results" on public.sponsored_results;
++create policy "portal admins can update sponsored results"
++on public.sponsored_results
++for update
++to authenticated
++using (chowseek_private.is_portal_admin())
++with check (chowseek_private.is_portal_admin());
++
++drop policy if exists "portal admins can delete unused sponsored results" on public.sponsored_results;
++create policy "portal admins can delete unused sponsored results"
++on public.sponsored_results
++for delete
++to authenticated
++using (
++  chowseek_private.is_portal_admin()
++  and coalesce(impression_count, 0) = 0
++);
+diff --git a/app.js b/app.js
+index 8dd575d..180f2e2 100644
+--- a/app.js
++++ b/app.js
+@@ -18,8 +18,9 @@ const views = {
+   denied: $("denied-view"),
+   portal: $("portal-view"),
+ };
+-let currentOffers = [];
+-let currentRedemptions = [];
++
++let currentSponsors = [];
++let editingSponsorId = null;
+ let recoveringPassword = window.location.hash.includes("type=recovery") ||
+   new URLSearchParams(window.location.search).get("type") === "recovery";
+ let passwordRecovery = new URLSearchParams(window.location.hash.slice(1)).get("type") === "recovery";
+@@ -61,30 +62,61 @@ function localDateTimeInput(date = new Date()) {
+   return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
+ }
+ 
++function isoToLocalDateTimeInput(value) {
++  if (!value) return "";
++  const date = new Date(value);
++  return Number.isNaN(date.getTime()) ? "" : localDateTimeInput(date);
++}
++
+ function toIsoOrNull(value) {
+   if (!value) return null;
+-  const d = new Date(value);
+-  if (Number.isNaN(d.getTime())) throw new Error("Enter a valid date and time.");
+-  return d.toISOString();
++  const date = new Date(value);
++  if (Number.isNaN(date.getTime())) throw new Error("Enter a valid date and time.");
++  return date.toISOString();
+ }
+ 
+ function formatDate(value) {
+-  if (!value) return "—";
+-  const d = new Date(value);
+-  return Number.isNaN(d.getTime()) ? "—" : new Intl.DateTimeFormat(undefined, {
++  if (!value) return "No end date";
++  const date = new Date(value);
++  return Number.isNaN(date.getTime()) ? "—" : new Intl.DateTimeFormat(undefined, {
+     dateStyle: "medium",
+     timeStyle: "short",
+-  }).format(d);
++  }).format(date);
++}
++
++function parseNumber(value, label) {
++  const number = Number(value);
++  if (!Number.isFinite(number)) throw new Error(`${label} must be a number.`);
++  return number;
++}
++
++function centsFromDollars(value) {
++  const dollars = parseNumber(value, "CPM rate");
++  if (dollars < 0) throw new Error("CPM rate cannot be negative.");
++  return Math.round((dollars + Number.EPSILON) * 100);
++}
++
++function formatMoney(cents, currency = "USD") {
++  const safeCurrency = /^[A-Z]{3}$/.test(currency || "") ? currency : "USD";
++  return new Intl.NumberFormat(undefined, {
++    style: "currency",
++    currency: safeCurrency,
++    minimumFractionDigits: 2,
++  }).format((Number(cents) || 0) / 100);
++}
++
++function calculatedSpendCents(sponsor) {
++  return Math.round(((Number(sponsor.impression_count) || 0) * (Number(sponsor.cpm_rate_cents) || 0)) / 1000);
+ }
+ 
+-function offerStatus(offer) {
++function placementStatus(sponsor) {
+   const now = Date.now();
+-  const from = new Date(offer.valid_from).getTime();
+-  const until = offer.valid_until ? new Date(offer.valid_until).getTime() : null;
+-  if (!offer.active) return ["Inactive", ""];
+-  if (from > now) return ["Scheduled", ""];
+-  if (until && until <= now) return ["Closed", "expired"];
+-  return ["Active", "active"];
++  const startsAt = new Date(sponsor.starts_at).getTime();
++  const endsAt = sponsor.ends_at ? new Date(sponsor.ends_at).getTime() : null;
++  if (!sponsor.active) return ["Paused", ""];
++  if (Number.isFinite(startsAt) && startsAt > now) return ["Scheduled", "scheduled"];
++  if (endsAt && endsAt <= now) return ["Ended", "expired"];
++  return ["Serving", "active"];
+ }
+ 
+ async function isPortalAdmin() {
+@@ -94,23 +126,21 @@ async function isPortalAdmin() {
+ }
+ 
+ async function routeAuthenticatedUser() {
+-  if (recoveringPassword) {
+-    showOnly("password");
+-    return;
+-  }
+-  if (passwordRecovery) {
++  if (recoveringPassword || passwordRecovery) {
+     showOnly("password");
+     return;
+   }
++
+   const { data: { user }, error } = await supabase.auth.getUser();
+   if (error || !user) {
+     showOnly("login");
+     return;
+   }
++
+   try {
+     if (!(await isPortalAdmin())) {
+       showOnly("denied");
+-      setNotice("This account is signed in, but it is not authorized for the Chowseek trial portal.", true);
++      setNotice("This account is signed in, but it is not authorized for the Chowseek sponsorship portal.", true);
+       return;
+     }
+     showOnly("portal");
+@@ -123,73 +153,145 @@ async function routeAuthenticatedUser() {
+ }
+ 
+ async function loadPortal() {
+-  const [offersResult, redemptionsResult] = await Promise.all([
+-    supabase
+-      .from("chowseek_trial_offers")
+-      .select("id,organization_name,match_type,match_value,active,valid_from,valid_until,notes,created_at,updated_at")
+-      .order("created_at", { ascending: false }),
+-    supabase
+-      .from("chowseek_trial_redemptions")
+-      .select("id,offer_id,email,trial_started_at,trial_ends_at,created_at")
+-      .order("trial_started_at", { ascending: false }),
+-  ]);
+-  if (offersResult.error) throw offersResult.error;
+-  if (redemptionsResult.error) throw redemptionsResult.error;
+-  currentOffers = offersResult.data ?? [];
+-  currentRedemptions = redemptionsResult.data ?? [];
++  const { data, error } = await supabase
++    .from("sponsored_results")
++    .select("id,advertiser_name,campaign_name,name,address,description,latitude,longitude,active,starts_at,ends_at,cpm_rate_cents,currency,impression_count,created_at,updated_at")
++    .order("created_at", { ascending: false });
++
++  if (error) throw error;
++  currentSponsors = data ?? [];
+   renderPortal();
+ }
+ 
+ function renderPortal() {
+-  const now = Date.now();
+-  const activeOffers = currentOffers.filter((offer) => offerStatus(offer)[0] === "Active").length;
+-  const activeTrials = currentRedemptions.filter((row) => new Date(row.trial_ends_at).getTime() > now).length;
+-  $("stat-active-offers").textContent = activeOffers;
+-  $("stat-active-trials").textContent = activeTrials;
+-  $("stat-redemptions").textContent = currentRedemptions.length;
+-
+-  const redemptionCounts = new Map();
+-  for (const row of currentRedemptions) {
+-    const entry = redemptionCounts.get(row.offer_id) ?? { total: 0, active: 0 };
+-    entry.total += 1;
+-    if (new Date(row.trial_ends_at).getTime() > now) entry.active += 1;
+-    redemptionCounts.set(row.offer_id, entry);
++  let serving = 0;
++  let scheduled = 0;
++  let impressions = 0;
++  let spendCents = 0;
++
++  for (const sponsor of currentSponsors) {
++    const [status] = placementStatus(sponsor);
++    if (status === "Serving") serving += 1;
++    if (status === "Scheduled") scheduled += 1;
++    impressions += Number(sponsor.impression_count) || 0;
++    spendCents += calculatedSpendCents(sponsor);
+   }
+ 
+-  $("offers-empty").classList.toggle("hidden", currentOffers.length !== 0);
+-  $("offers-list").innerHTML = currentOffers.map((offer) => {
+-    const [status, statusClass] = offerStatus(offer);
+-    const counts = redemptionCounts.get(offer.id) ?? { total: 0, active: 0 };
+-    const matcher = offer.match_type === "domain" ? `@${offer.match_value}` : offer.match_value;
+-    return `<article class="offer" data-offer-id="${html(offer.id)}">
++  $("stat-serving").textContent = serving.toLocaleString();
++  $("stat-scheduled").textContent = scheduled.toLocaleString();
++  $("stat-impressions").textContent = impressions.toLocaleString();
++  $("stat-spend").textContent = formatMoney(spendCents, "USD");
++
++  $("sponsors-empty").classList.toggle("hidden", currentSponsors.length !== 0);
++  $("sponsors-list").innerHTML = currentSponsors.map((sponsor) => {
++    const [status, statusClass] = placementStatus(sponsor);
++    const impressionsForSponsor = Number(sponsor.impression_count) || 0;
++    const spend = formatMoney(calculatedSpendCents(sponsor), sponsor.currency);
++    const campaign = sponsor.campaign_name ? `<span>Campaign: <strong>${html(sponsor.campaign_name)}</strong></span>` : "";
++    const deleteDisabled = impressionsForSponsor > 0
++      ? 'disabled title="Placements with recorded impressions are retained for reporting history"'
++      : "";
++
++    return `<article class="offer" data-sponsor-id="${html(sponsor.id)}">
+       <div>
+-        <div class="offer-meta"><span class="badge ${statusClass}">${html(status)}</span><span>${offer.match_type === "domain" ? "Domain" : "Exact email"}: <strong>${html(matcher)}</strong></span><span>${counts.active} active / ${counts.total} claimed</span></div>
+-        <h3>${html(offer.organization_name)}</h3>
+-        <div class="offer-meta"><span>From ${html(formatDate(offer.valid_from))}</span><span>New claims end ${html(formatDate(offer.valid_until))}</span></div>
+-        ${offer.notes ? `<p class="offer-note">${html(offer.notes)}</p>` : ""}
++        <div class="offer-meta">
++          <span class="badge ${statusClass}">${html(status)}</span>
++          <span>Sponsor: <strong>${html(sponsor.advertiser_name)}</strong></span>
++          ${campaign}
++        </div>
++        <h3>${html(sponsor.name)}</h3>
++        <p class="address-line">${html(sponsor.address)}</p>
++        <p class="offer-note">${html(sponsor.description)}</p>
++        <div class="offer-meta detail-row">
++          <span>${html(Number(sponsor.latitude).toFixed(5))}, ${html(Number(sponsor.longitude).toFixed(5))}</span>
++          <span>${html(formatMoney(sponsor.cpm_rate_cents, sponsor.currency))} CPM</span>
++          <span>${impressionsForSponsor.toLocaleString()} impressions</span>
++          <span>${html(spend)} estimated spend</span>
++        </div>
++        <div class="offer-meta detail-row">
++          <span>Starts ${html(formatDate(sponsor.starts_at))}</span>
++          <span>Ends ${html(formatDate(sponsor.ends_at))}</span>
++        </div>
+       </div>
+       <div class="actions">
+-        <button class="secondary toggle-offer" type="button" data-id="${html(offer.id)}" data-active="${offer.active}">${offer.active ? "Pause" : "Activate"}</button>
+-        <button class="danger delete-offer" type="button" data-id="${html(offer.id)}" ${counts.total ? 'disabled title="Offers with redemptions are retained for audit history"' : ''}>Delete</button>
++        <button class="secondary edit-sponsor" type="button" data-id="${html(sponsor.id)}">Edit</button>
++        <button class="secondary toggle-sponsor" type="button" data-id="${html(sponsor.id)}" data-active="${sponsor.active}">${sponsor.active ? "Pause" : "Activate"}</button>
++        <button class="danger delete-sponsor" type="button" data-id="${html(sponsor.id)}" ${deleteDisabled}>Delete</button>
+       </div>
+     </article>`;
+   }).join("");
++}
+ 
+-  const offerNames = new Map(currentOffers.map((offer) => [offer.id, offer.organization_name]));
+-  $("redemptions-empty").classList.toggle("hidden", currentRedemptions.length !== 0);
+-  $("redemptions-table").classList.toggle("hidden", currentRedemptions.length === 0);
+-  $("redemptions-body").innerHTML = currentRedemptions.map((row) => {
+-    const active = new Date(row.trial_ends_at).getTime() > now;
+-    return `<tr><td>${html(row.email)}</td><td>${html(offerNames.get(row.offer_id) ?? "Unknown offer")}</td><td>${html(formatDate(row.trial_started_at))}</td><td>${html(formatDate(row.trial_ends_at))}</td><td><span class="badge ${active ? "active" : "expired"}">${active ? "Active" : "Ended"}</span></td></tr>`;
+-  }).join("");
++function resetSponsorForm() {
++  editingSponsorId = null;
++  $("sponsor-form").reset();
++  $("starts-at").value = localDateTimeInput();
++  $("currency").value = "USD";
++  $("active").checked = false;
++  $("form-eyebrow").textContent = "NEW PLACEMENT";
++  $("form-title").textContent = "Add a sponsored result";
++  $("save-sponsor").textContent = "Create placement";
++  $("save-sponsor").dataset.defaultLabel = "Create placement";
++  $("cancel-edit").classList.add("hidden");
+ }
+ 
+-$("match-type").addEventListener("change", () => {
+-  const exact = $("match-type").value === "exact_email";
+-  $("match-label").textContent = exact ? "Exact email address" : "Email domain";
+-  $("match-value").placeholder = exact ? "reporter@school.edu" : "school.edu";
+-  $("match-value").type = exact ? "email" : "text";
+-});
++function beginEdit(id) {
++  const sponsor = currentSponsors.find((row) => row.id === id);
++  if (!sponsor) return;
++
++  editingSponsorId = id;
++  $("advertiser-name").value = sponsor.advertiser_name ?? "";
++  $("campaign-name").value = sponsor.campaign_name ?? "";
++  $("place-name").value = sponsor.name ?? "";
++  $("address").value = sponsor.address ?? "";
++  $("description").value = sponsor.description ?? "";
++  $("latitude").value = sponsor.latitude ?? "";
++  $("longitude").value = sponsor.longitude ?? "";
++  $("starts-at").value = isoToLocalDateTimeInput(sponsor.starts_at);
++  $("ends-at").value = isoToLocalDateTimeInput(sponsor.ends_at);
++  $("cpm-rate").value = ((Number(sponsor.cpm_rate_cents) || 0) / 100).toFixed(2);
++  $("currency").value = (sponsor.currency || "USD").toUpperCase();
++  $("active").checked = Boolean(sponsor.active);
++  $("form-eyebrow").textContent = "EDIT PLACEMENT";
++  $("form-title").textContent = sponsor.name;
++  $("save-sponsor").textContent = "Save changes";
++  $("save-sponsor").dataset.defaultLabel = "Save changes";
++  $("cancel-edit").classList.remove("hidden");
++  $("advertiser-name").focus();
++  window.scrollTo({ top: 0, behavior: "smooth" });
++}
++
++function sponsorPayloadFromForm() {
++  const latitude = parseNumber($("latitude").value, "Latitude");
++  const longitude = parseNumber($("longitude").value, "Longitude");
++  if (latitude < -90 || latitude > 90) throw new Error("Latitude must be between -90 and 90.");
++  if (longitude < -180 || longitude > 180) throw new Error("Longitude must be between -180 and 180.");
++
++  const startsAt = toIsoOrNull($("starts-at").value);
++  const endsAt = toIsoOrNull($("ends-at").value);
++  if (endsAt && new Date(endsAt).getTime() <= new Date(startsAt).getTime()) {
++    throw new Error("Ends at must be later than Starts at.");
++  }
++
++  const currency = $("currency").value.trim().toUpperCase();
++  if (!/^[A-Z]{3}$/.test(currency)) throw new Error("Currency must be a three-letter code such as USD.");
++
++  return {
++    advertiser_name: $("advertiser-name").value.trim(),
++    campaign_name: $("campaign-name").value.trim() || null,
++    name: $("place-name").value.trim(),
++    address: $("address").value.trim(),
++    description: $("description").value.trim(),
++    latitude,
++    longitude,
++    active: $("active").checked,
++    starts_at: startsAt,
++    ends_at: endsAt,
++    cpm_rate_cents: centsFromDollars($("cpm-rate").value),
++    currency,
++    updated_at: new Date().toISOString(),
++  };
++}
+ 
+ $("login-form").addEventListener("submit", async (event) => {
+   event.preventDefault();
+@@ -232,7 +334,6 @@ $("password-form").addEventListener("submit", async (event) => {
+     const { error } = await supabase.auth.updateUser({ password });
+     if (error) throw error;
+     passwordRecovery = false;
+-    history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
+     recoveringPassword = false;
+     history.replaceState(null, "", new URL("./", window.location.href).pathname);
+     setNotice("Password updated.");
+@@ -242,63 +343,74 @@ $("password-form").addEventListener("submit", async (event) => {
+   }
+ });
+ 
+-$("offer-form").addEventListener("submit", async (event) => {
++$("sponsor-form").addEventListener("submit", async (event) => {
+   event.preventDefault();
+-  const button = $("create-offer");
+-  setBusy(button, true, "Creating…");
++  const button = $("save-sponsor");
++  setBusy(button, true, editingSponsorId ? "Saving…" : "Creating…");
+   setNotice("");
++
+   try {
+-    let matchValue = $("match-value").value.trim().toLowerCase();
+-    if ($("match-type").value === "domain") matchValue = matchValue.replace(/^@+/, "");
+-    const payload = {
+-      organization_name: $("organization-name").value.trim(),
+-      match_type: $("match-type").value,
+-      match_value: matchValue,
+-      active: $("active").checked,
+-      valid_from: toIsoOrNull($("valid-from").value),
+-      valid_until: toIsoOrNull($("valid-until").value),
+-      notes: $("notes").value.trim() || null,
+-    };
+-    const { error } = await supabase.from("chowseek_trial_offers").insert(payload);
++    const payload = sponsorPayloadFromForm();
++    let error;
++
++    if (editingSponsorId) {
++      ({ error } = await supabase.from("sponsored_results").update(payload).eq("id", editingSponsorId));
++    } else {
++      ({ error } = await supabase.from("sponsored_results").insert(payload));
++    }
++
+     if (error) throw error;
+-    $("offer-form").reset();
+-    $("active").checked = true;
+-    $("valid-from").value = localDateTimeInput();
+-    $("match-type").dispatchEvent(new Event("change"));
+-    setNotice("Approval created. Matching verified accounts will receive one month when they next sign in/use Chowseek.");
++    const message = editingSponsorId ? "Sponsored placement updated." : "Sponsored placement created.";
++    resetSponsorForm();
++    setNotice(message);
+     await loadPortal();
+   } catch (err) {
+-    const duplicate = err.code === "23505";
+-    setNotice(duplicate ? "That domain or exact email already has an approval. Reactivate the existing approval instead." : (err.message || "Could not create approval."), true);
++    setNotice(err.message || "Could not save sponsored placement.", true);
+   } finally {
+     setBusy(button, false);
+   }
+ });
+ 
+-$("offers-list").addEventListener("click", async (event) => {
+-  const toggle = event.target.closest(".toggle-offer");
+-  const del = event.target.closest(".delete-offer");
+-  if (!toggle && !del) return;
++$("cancel-edit").addEventListener("click", () => {
++  resetSponsorForm();
++  setNotice("Edit cancelled.");
++});
++
++$("sponsors-list").addEventListener("click", async (event) => {
++  const edit = event.target.closest(".edit-sponsor");
++  const toggle = event.target.closest(".toggle-sponsor");
++  const del = event.target.closest(".delete-sponsor");
++  if (!edit && !toggle && !del) return;
++
++  if (edit) {
++    beginEdit(edit.dataset.id);
++    return;
++  }
++
+   setNotice("");
+   try {
+     if (toggle) {
+       toggle.disabled = true;
+       const id = toggle.dataset.id;
+       const next = toggle.dataset.active !== "true";
+-      const { error } = await supabase.from("chowseek_trial_offers").update({ active: next }).eq("id", id);
++      const { error } = await supabase
++        .from("sponsored_results")
++        .update({ active: next, updated_at: new Date().toISOString() })
++        .eq("id", id);
+       if (error) throw error;
+-      setNotice(next ? "Approval activated." : "Approval paused. Existing trials are unchanged.");
++      setNotice(next ? "Placement activated. It will serve when its schedule is current." : "Placement paused.");
+     } else if (del) {
+       const id = del.dataset.id;
+-      if (!window.confirm("Delete this unused approval?")) return;
++      if (!window.confirm("Delete this placement? This is only allowed before it has recorded impressions.")) return;
+       del.disabled = true;
+-      const { error } = await supabase.from("chowseek_trial_offers").delete().eq("id", id);
++      const { error } = await supabase.from("sponsored_results").delete().eq("id", id);
+       if (error) throw error;
+-      setNotice("Approval deleted.");
++      if (editingSponsorId === id) resetSponsorForm();
++      setNotice("Placement deleted.");
+     }
+     await loadPortal();
+   } catch (err) {
+-    setNotice(err.message || "Could not update approval.", true);
++    setNotice(err.message || "Could not update sponsored placement.", true);
+     await loadPortal();
+   }
+ });
+@@ -306,7 +418,7 @@ $("offers-list").addEventListener("click", async (event) => {
+ $("refresh").addEventListener("click", async () => {
+   try {
+     await loadPortal();
+-    setNotice("Portal data refreshed.");
++    setNotice("Sponsorship data refreshed.");
+   } catch (err) {
+     setNotice(err.message || "Refresh failed.", true);
+   }
+@@ -314,12 +426,13 @@ $("refresh").addEventListener("click", async () => {
+ 
+ async function signOut() {
+   await supabase.auth.signOut();
+-  currentOffers = [];
+-  currentRedemptions = [];
++  currentSponsors = [];
++  editingSponsorId = null;
+   $("login-password").value = "";
+   $("new-password").value = "";
+   window.location.reload();
+ }
++
+ $("sign-out").addEventListener("click", signOut);
+ $("denied-sign-out").addEventListener("click", signOut);
+ 
+@@ -331,5 +444,5 @@ supabase.auth.onAuthStateChange(async (event) => {
+   }
+ });
+ 
+-$("valid-from").value = localDateTimeInput();
++resetSponsorForm();
+ await routeAuthenticatedUser();
+diff --git a/index.html b/index.html
+index 3997284..4bf45d2 100644
+--- a/index.html
++++ b/index.html
+@@ -5,16 +5,16 @@
+     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+     <meta name="referrer" content="same-origin" />
+     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://esm.sh; connect-src 'self' https://ugbindlzyqaktejbxalk.supabase.co https://esm.sh; style-src 'self'; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests" />
+-    <title>Chowseek Trial Portal</title>
++    <title>Chowseek Sponsorship Portal</title>
+     <link rel="stylesheet" href="./styles.css" />
+   </head>
+   <body>
+     <main class="shell">
+-      <section class="brand-row" aria-label="Chowseek admin portal">
++      <section class="brand-row" aria-label="Chowseek sponsorship portal">
+         <div>
+           <p class="eyebrow">CHOWSEEK</p>
+-          <h1>Organization trial portal</h1>
+-          <p class="lede">Approve a verified email domain or one exact email for a one-month Chowseek trial.</p>
++          <h1>Sponsorship portal</h1>
++          <p class="lede">Create and manage sponsored map placements, campaign schedules, CPM rates, and serving status.</p>
+         </div>
+         <button id="sign-out" class="secondary hidden" type="button">Sign out</button>
+       </section>
+@@ -57,53 +57,80 @@
+           <section class="card">
+             <div class="section-heading">
+               <div>
+-                <p class="eyebrow">NEW APPROVAL</p>
+-                <h2>Grant organization access</h2>
++                <p id="form-eyebrow" class="eyebrow">NEW PLACEMENT</p>
++                <h2 id="form-title">Add a sponsored result</h2>
+               </div>
++              <button id="cancel-edit" class="secondary hidden" type="button">Cancel edit</button>
+             </div>
+-            <form id="offer-form" class="stack">
+-              <label>Organization
+-                <input id="organization-name" type="text" maxlength="160" placeholder="Example University Daily" required />
++
++            <form id="sponsor-form" class="stack">
++              <div class="grid two-col compact">
++                <label>Advertiser / sponsor
++                  <input id="advertiser-name" type="text" maxlength="200" placeholder="Example Advertiser" required />
++                </label>
++                <label>Campaign name <span class="optional">optional</span>
++                  <input id="campaign-name" type="text" maxlength="200" placeholder="Fall launch" />
++                </label>
++              </div>
++
++              <label>Sponsored place / business name
++                <input id="place-name" type="text" maxlength="200" placeholder="Example Restaurant" required />
+               </label>
+-              <label>Who can claim it?
+-                <select id="match-type">
+-                  <option value="domain">Any verified email on a domain</option>
+-                  <option value="exact_email">One exact verified email</option>
+-                </select>
++              <label>Display address
++                <input id="address" type="text" maxlength="500" placeholder="123 Main St, Los Angeles, CA 90000" required />
+               </label>
+-              <label><span id="match-label">Email domain</span>
+-                <input id="match-value" type="text" maxlength="320" placeholder="school.edu" required />
++              <label>Description
++                <textarea id="description" maxlength="1500" rows="4" placeholder="A short sponsored description. Add a second sentence with the offer or reason to visit." required></textarea>
+               </label>
++
+               <div class="grid two-col compact">
+-                <label>Available from
+-                  <input id="valid-from" type="datetime-local" required />
++                <label>Latitude
++                  <input id="latitude" type="number" min="-90" max="90" step="any" inputmode="decimal" placeholder="34.0522" required />
+                 </label>
+-                <label>Stop new claims after <span class="optional">optional</span>
+-                  <input id="valid-until" type="datetime-local" />
++                <label>Longitude
++                  <input id="longitude" type="number" min="-180" max="180" step="any" inputmode="decimal" placeholder="-118.2437" required />
+                 </label>
+               </div>
+-              <label>Notes <span class="optional">optional</span>
+-                <textarea id="notes" maxlength="2000" rows="4" placeholder="Press arrangement, contact, campaign details…"></textarea>
+-              </label>
++              <p class="help form-help">Use the exact marker coordinates for the sponsored place. The mobile app matches placements to the visible map viewport.</p>
++
++              <div class="grid two-col compact">
++                <label>Starts at
++                  <input id="starts-at" type="datetime-local" required />
++                </label>
++                <label>Ends at <span class="optional">optional</span>
++                  <input id="ends-at" type="datetime-local" />
++                </label>
++              </div>
++
++              <div class="grid two-col compact">
++                <label>CPM rate
++                  <div class="input-prefix"><span>$</span><input id="cpm-rate" type="number" min="0" step="0.01" inputmode="decimal" placeholder="25.00" required /></div>
++                </label>
++                <label>Currency
++                  <input id="currency" type="text" minlength="3" maxlength="3" value="USD" pattern="[A-Za-z]{3}" required />
++                </label>
++              </div>
++
+               <label class="check-row">
+-                <input id="active" type="checkbox" checked />
+-                <span>Approval is active</span>
++                <input id="active" type="checkbox" />
++                <span>Placement is active</span>
+               </label>
+-              <p class="help">An eligible user receives one calendar month from the moment their verified account first claims the offer. Turning an approval off stops new claims; existing trials keep their original end date.</p>
+-              <button id="create-offer" type="submit">Create approval</button>
++              <p class="help">New placements default to off. A placement only serves when it is active and the current time is inside its schedule.</p>
++              <button id="save-sponsor" type="submit">Create placement</button>
+             </form>
+           </section>
+ 
+           <section class="card stats-card">
+             <p class="eyebrow">OVERVIEW</p>
+             <div class="stats">
+-              <div><strong id="stat-active-offers">0</strong><span>active approvals</span></div>
+-              <div><strong id="stat-active-trials">0</strong><span>trials running</span></div>
+-              <div><strong id="stat-redemptions">0</strong><span>total claims</span></div>
++              <div><strong id="stat-serving">0</strong><span>serving now</span></div>
++              <div><strong id="stat-scheduled">0</strong><span>scheduled</span></div>
++              <div><strong id="stat-impressions">0</strong><span>impressions</span></div>
++              <div><strong id="stat-spend">$0.00</strong><span>estimated spend</span></div>
+             </div>
+             <div class="security-note">
+-              <strong>Static-site safe</strong>
+-              <p>This page uses only the project publishable key. Supabase RLS performs the real admin authorization; no service-role key is embedded here.</p>
++              <strong>GitHub Pages safe</strong>
++              <p>This page ships only the Supabase publishable key. Database RLS checks the signed-in portal admin before allowing sponsorship reads or writes.</p>
+             </div>
+           </section>
+         </div>
+@@ -111,29 +138,13 @@
+         <section class="card list-card">
+           <div class="section-heading toolbar">
+             <div>
+-              <p class="eyebrow">APPROVALS</p>
+-              <h2>Organizations & exact-email offers</h2>
++              <p class="eyebrow">PLACEMENTS</p>
++              <h2>Sponsored map results</h2>
+             </div>
+             <button id="refresh" class="secondary" type="button">Refresh</button>
+           </div>
+-          <div id="offers-empty" class="empty hidden">No approvals yet.</div>
+-          <div id="offers-list" class="offer-list"></div>
+-        </section>
+-
+-        <section class="card list-card">
+-          <div class="section-heading">
+-            <div>
+-              <p class="eyebrow">CLAIMS</p>
+-              <h2>Trial redemptions</h2>
+-            </div>
+-          </div>
+-          <div id="redemptions-empty" class="empty hidden">No one has claimed a trial yet.</div>
+-          <div class="table-wrap">
+-            <table id="redemptions-table" class="hidden">
+-              <thead><tr><th>Email</th><th>Organization</th><th>Started</th><th>Ends</th><th>Status</th></tr></thead>
+-              <tbody id="redemptions-body"></tbody>
+-            </table>
+-          </div>
++          <div id="sponsors-empty" class="empty hidden">No sponsored placements yet.</div>
++          <div id="sponsors-list" class="offer-list"></div>
+         </section>
+       </section>
+     </main>
+diff --git a/styles.css b/styles.css
+index a21929e..fdcafa5 100644
+--- a/styles.css
++++ b/styles.css
+@@ -6,8 +6,8 @@
+   --muted: #696962;
+   --line: #deded7;
+   --soft: #f0f0eb;
+-  --accent: #1d5a43;
+-  --accent-strong: #144531;
++  --accent: #6f3cc3;
++  --accent-strong: #54269f;
+   --danger: #a33131;
+   --shadow: 0 18px 50px rgba(25, 31, 25, 0.08);
+   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+@@ -29,7 +29,7 @@ h2 { margin-bottom: 8px; font-size: 1.28rem; letter-spacing: -0.02em; }
+ .stack { display: grid; gap: 16px; }
+ label { display: grid; gap: 7px; color: #353530; font-size: .9rem; font-weight: 650; }
+ input, select, textarea { width: 100%; border: 1px solid #cfcfc6; border-radius: 10px; background: #fff; color: var(--ink); padding: 11px 12px; outline: none; transition: border-color .15s, box-shadow .15s; }
+-input:focus, select:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(29, 90, 67, .12); }
++input:focus, select:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(111, 60, 195, .12); }
+ textarea { resize: vertical; min-height: 92px; }
+ button { border: 1px solid var(--accent); border-radius: 10px; background: var(--accent); color: white; padding: 11px 15px; font-weight: 750; }
+ button:hover { background: var(--accent-strong); }
+@@ -49,31 +49,34 @@ button.danger:hover { background: #fff4f4; }
+ .check-row { grid-template-columns: auto 1fr; align-items: center; gap: 10px; }
+ .check-row input { width: 18px; height: 18px; }
+ .help { margin: -2px 0 0; color: var(--muted); font-size: .84rem; line-height: 1.5; }
++.form-help { margin-top: -8px; }
++.input-prefix { position: relative; }
++.input-prefix span { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); }
++.input-prefix input { padding-left: 26px; }
+ .stats-card { align-self: start; }
+ .stats { display: grid; gap: 8px; margin: 4px 0 24px; }
+ .stats > div { display: flex; align-items: baseline; justify-content: space-between; gap: 18px; border-bottom: 1px solid var(--line); padding: 14px 0; }
+ .stats strong { font-size: 2rem; letter-spacing: -.04em; }
+ .stats span { color: var(--muted); text-align: right; }
+-.security-note { background: #eef6f1; border-radius: 12px; padding: 16px; color: #244435; }
++.security-note { background: #f3eefb; border-radius: 12px; padding: 16px; color: #3e2b61; }
+ .security-note p { margin: 6px 0 0; line-height: 1.5; font-size: .88rem; }
+ .list-card { margin-top: 22px; }
+ .offer-list { display: grid; gap: 12px; }
+ .offer { border: 1px solid var(--line); border-radius: 14px; padding: 17px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: start; }
+-.offer h3 { margin: 0 0 5px; font-size: 1.03rem; }
++.offer h3 { margin: 7px 0 4px; font-size: 1.08rem; }
+ .offer-meta { display: flex; flex-wrap: wrap; gap: 7px 12px; color: var(--muted); font-size: .83rem; }
++.detail-row { margin-top: 10px; }
++.address-line { margin: 0; color: var(--muted); font-size: .88rem; }
+ .offer-note { margin: 10px 0 0; color: #474740; line-height: 1.45; white-space: pre-wrap; }
+ .actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: end; }
+ .actions button { padding: 8px 10px; font-size: .82rem; }
+ .badge { display: inline-flex; align-items: center; border-radius: 999px; padding: 4px 8px; font-size: .74rem; font-weight: 750; background: var(--soft); color: #4f4f49; }
+-.badge.active { background: #e6f4eb; color: #1d643f; }
++.badge.active { background: #ece2fb; color: #6032a7; }
++.badge.scheduled { background: #e7eefb; color: #365a9a; }
+ .badge.expired { background: #f4e9e9; color: #893333; }
+-.notice { margin-bottom: 18px; border: 1px solid #bdd4c6; background: #eef6f1; color: #214835; border-radius: 12px; padding: 12px 14px; }
++.notice { margin-bottom: 18px; border: 1px solid #cbb7ed; background: #f5f0fc; color: #4c2c7d; border-radius: 12px; padding: 12px 14px; }
+ .notice.error { border-color: #e0bcbc; background: #fff1f1; color: #7e2929; }
+ .empty { color: var(--muted); text-align: center; padding: 32px 10px; }
+-.table-wrap { overflow-x: auto; }
+-table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+-th, td { text-align: left; padding: 12px 10px; border-top: 1px solid var(--line); vertical-align: top; }
+-th { color: var(--muted); font-size: .76rem; text-transform: uppercase; letter-spacing: .06em; }
+ .hidden { display: none !important; }
+ @media (max-width: 820px) {
+   .two-col { grid-template-columns: 1fr; }

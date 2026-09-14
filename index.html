@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="referrer" content="same-origin" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://esm.sh; connect-src 'self' https://ugbindlzyqaktejbxalk.supabase.co https://esm.sh; style-src 'self'; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests" />
+    <title>Chowseek Sponsorship Portal</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="brand-row" aria-label="Chowseek sponsorship portal">
+        <div>
+          <p class="eyebrow">CHOWSEEK</p>
+          <h1>Sponsorship portal</h1>
+          <p class="lede">Create and manage sponsored map placements, campaign schedules, CPM rates, and serving status.</p>
+        </div>
+        <button id="sign-out" class="secondary hidden" type="button">Sign out</button>
+      </section>
+
+      <div id="notice" class="notice hidden" role="status" aria-live="polite"></div>
+
+      <section id="login-view" class="card auth-card">
+        <h2>Admin sign in</h2>
+        <p>Use a Supabase account that has been explicitly added to the private Chowseek portal-admin allowlist.</p>
+        <form id="login-form" class="stack">
+          <label>Email
+            <input id="login-email" type="email" autocomplete="username" required />
+          </label>
+          <label>Password
+            <input id="login-password" type="password" autocomplete="current-password" required minlength="8" />
+          </label>
+          <button id="login-submit" type="submit">Sign in</button>
+        </form>
+        <button id="forgot-password" class="link-button" type="button">Set or reset admin password</button>
+      </section>
+
+      <section id="password-view" class="card auth-card hidden">
+        <h2>Choose a new password</h2>
+        <form id="password-form" class="stack">
+          <label>New password
+            <input id="new-password" type="password" autocomplete="new-password" required minlength="12" />
+          </label>
+          <button type="submit">Save password</button>
+        </form>
+      </section>
+
+      <section id="denied-view" class="card auth-card hidden">
+        <h2>Not authorized</h2>
+        <p>This Supabase account is valid, but it is not on the Chowseek portal-admin allowlist.</p>
+        <button id="denied-sign-out" class="secondary" type="button">Sign out</button>
+      </section>
+
+      <section id="portal-view" class="hidden">
+        <div class="grid two-col">
+          <section class="card">
+            <div class="section-heading">
+              <div>
+                <p id="form-eyebrow" class="eyebrow">NEW PLACEMENT</p>
+                <h2 id="form-title">Add a sponsored result</h2>
+              </div>
+              <button id="cancel-edit" class="secondary hidden" type="button">Cancel edit</button>
+            </div>
+
+            <form id="sponsor-form" class="stack">
+              <div class="grid two-col compact">
+                <label>Advertiser / sponsor
+                  <input id="advertiser-name" type="text" maxlength="200" placeholder="Example Advertiser" required />
+                </label>
+                <label>Campaign name <span class="optional">optional</span>
+                  <input id="campaign-name" type="text" maxlength="200" placeholder="Fall launch" />
+                </label>
+              </div>
+
+              <label>Sponsored place / business name
+                <input id="place-name" type="text" maxlength="200" placeholder="Example Restaurant" required />
+              </label>
+              <label>Display address
+                <input id="address" type="text" maxlength="500" placeholder="123 Main St, Los Angeles, CA 90000" required />
+              </label>
+              <label>Description
+                <textarea id="description" maxlength="1500" rows="4" placeholder="A short sponsored description. Add a second sentence with the offer or reason to visit." required></textarea>
+              </label>
+
+              <div class="grid two-col compact">
+                <label>Latitude
+                  <input id="latitude" type="number" min="-90" max="90" step="any" inputmode="decimal" placeholder="34.0522" required />
+                </label>
+                <label>Longitude
+                  <input id="longitude" type="number" min="-180" max="180" step="any" inputmode="decimal" placeholder="-118.2437" required />
+                </label>
+              </div>
+              <p class="help form-help">Use the exact marker coordinates for the sponsored place. The mobile app matches placements to the visible map viewport.</p>
+
+              <div class="grid two-col compact">
+                <label>Starts at
+                  <input id="starts-at" type="datetime-local" required />
+                </label>
+                <label>Ends at <span class="optional">optional</span>
+                  <input id="ends-at" type="datetime-local" />
+                </label>
+              </div>
+
+              <div class="grid two-col compact">
+                <label>CPM rate
+                  <div class="input-prefix"><span>$</span><input id="cpm-rate" type="number" min="0" step="0.01" inputmode="decimal" placeholder="25.00" required /></div>
+                </label>
+                <label>Currency
+                  <input id="currency" type="text" minlength="3" maxlength="3" value="USD" pattern="[A-Za-z]{3}" required />
+                </label>
+              </div>
+
+              <label class="check-row">
+                <input id="active" type="checkbox" />
+                <span>Placement is active</span>
+              </label>
+              <p class="help">New placements default to off. A placement only serves when it is active and the current time is inside its schedule.</p>
+              <button id="save-sponsor" type="submit">Create placement</button>
+            </form>
+          </section>
+
+          <section class="card stats-card">
+            <p class="eyebrow">OVERVIEW</p>
+            <div class="stats">
+              <div><strong id="stat-serving">0</strong><span>serving now</span></div>
+              <div><strong id="stat-scheduled">0</strong><span>scheduled</span></div>
+              <div><strong id="stat-impressions">0</strong><span>impressions</span></div>
+              <div><strong id="stat-spend">$0.00</strong><span>estimated spend</span></div>
+            </div>
+            <div class="security-note">
+              <strong>GitHub Pages safe</strong>
+              <p>This page ships only the Supabase publishable key. Database RLS checks the signed-in portal admin before allowing sponsorship reads or writes.</p>
+            </div>
+          </section>
+        </div>
+
+        <section class="card list-card">
+          <div class="section-heading toolbar">
+            <div>
+              <p class="eyebrow">PLACEMENTS</p>
+              <h2>Sponsored map results</h2>
+            </div>
+            <button id="refresh" class="secondary" type="button">Refresh</button>
+          </div>
+          <div id="sponsors-empty" class="empty hidden">No sponsored placements yet.</div>
+          <div id="sponsors-list" class="offer-list"></div>
+        </section>
+      </section>
+    </main>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
