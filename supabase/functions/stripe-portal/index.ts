@@ -14,7 +14,7 @@ Deno.serve(async (req) => {
     await requireRestaurantOwner(req, restaurantId);
     const { data: restaurant, error } = await admin.from('restaurants').select('stripe_customer_id').eq('id', restaurantId).single();
     if (error) throw error; if (!restaurant.stripe_customer_id) throw new Error('No Stripe customer exists for this restaurant yet.');
-    const returnUrl = Deno.env.get('PORTAL_URL') ?? 'https://sponsors.chowseek.com/';
+    const returnUrl = Deno.env.get('PORTAL_URL') ?? 'https://sponsor.chowseek.com/';
     const session = await stripe.billingPortal.sessions.create({ customer: restaurant.stripe_customer_id, return_url: returnUrl });
     return json({ url: session.url });
   } catch (error) {
