@@ -1,73 +1,110 @@
-# Chowseek sponsorship portal
+# Chowseek restaurant portal
 
-This folder is a static sponsorship-admin site designed to deploy directly to GitHub Pages. It uses Supabase Auth plus the project **publishable** key in the browser; it never embeds a service-role/secret key.
+Full-stack TypeScript portal for restaurant customers and Chowseek platform administrators.
 
-The portal manages the existing `public.sponsored_results` model documented in `SPONSORED_RESULTS.md`:
+## What changed
 
-- advertiser and optional campaign name
-- sponsored place/business name, address, and description
-- latitude/longitude used by the mobile map viewport query
-- start/end schedule and active switch
-- CPM rate and currency
-- impression count and calculated estimated spend
+- Restaurant users sign in with Supabase Auth and can only read their assigned restaurant(s).
+- Owners/editors can update restaurant profile data; viewers are read-only.
+- Sponsored placements are attached to `restaurant_id` and protected by tenant RLS.
+- Existing placements are retained under an admin-only **Legacy / Unassigned** restaurant so nothing disappears during migration.
+- Platform admins can see every restaurant, adjust user/placement limits, enable/disable restaurants, invite users, remove access, and delete non-admin accounts.
+- Stripe Billing uses hosted Checkout for subscription start/change and Stripe Customer Portal for payment methods, invoices, and cancellation.
+- Stripe webhook events synchronize subscription state back to the restaurant record and are idempotently recorded.
+- Database triggers enforce `max_users` and `max_placements` even if a caller bypasses the UI.
+- Audit rows are written for restaurant, membership, and sponsored-placement changes.
 
-Admins can create, edit, activate/pause, and delete unused placements. Once a placement has recorded impressions, the portal keeps it for reporting history instead of deleting it.
+## Architecture
 
-## One-time database setup
+The browser contains only the Supabase publishable key. Normal restaurant/profile/placement CRUD is protected by Postgres RLS. Operations that require Supabase Auth Admin or Stripe credentials run in Supabase Edge Functions with server-only secrets.
 
-The sponsored-results migration intentionally keeps normal mobile clients away from direct table access. For a static GitHub Pages admin portal, run `SPONSOR_PORTAL_SETUP.sql` once in the linked Supabase project's SQL Editor.
+### Roles
 
-That setup grants `authenticated` table operations but protects every operation with RLS using the existing private portal-admin check:
+- **platform admin** — all restaurants + privileged account/limit management
+- **owner** — edit restaurant, placements, and billing
+- **editor** — edit restaurant and placements
+- **viewer** — read-only restaurant and placement access
 
-```text
-chowseek_private.is_portal_admin()
-```
+Authorization is stored in `public.platform_admins` and `public.restaurant_memberships`; it does not trust user-editable Auth metadata.
 
-This is what makes browser-side CRUD safe with the publishable key: possession of the key alone does not grant sponsorship access.
+## Database setup
 
-## Admin bootstrap
+Apply `supabase/migrations/20260915120000_restaurant_portal.sql` to the same Supabase project that contains `public.sponsored_results`.
 
-Use the same private portal-admin allowlist as the trial portal. Choose an existing Supabase Auth account with a password, then add it from the SQL Editor if needed:
+Bootstrap the first platform admin using an existing Auth user:
 
 ```sql
-insert into chowseek_private.portal_admins (user_id)
-select id
-from auth.users
-where lower(email) = lower('YOUR_ADMIN_EMAIL@example.com')
+insert into public.platform_admins (user_id)
+select id from auth.users where lower(email) = lower('YOUR_ADMIN_EMAIL@example.com')
 on conflict (user_id) do nothing;
 ```
 
-There is intentionally no public sign-up flow in this portal.
+The migration intentionally gives browser users no write privileges to memberships, Stripe state, plan keys, feature flags, or account limits. Those fields are only changed by trusted Edge Functions.
 
-## GitHub Pages
+## Edge Functions
 
-There is no build step. Publish this directory as the Pages site root, or copy its files into a repository `docs/` directory and configure Pages to deploy that directory.
+Deploy:
 
-The Supabase client import is pinned to `@supabase/supabase-js@2.95.0` through `esm.sh`.
-
-If password reset is used, add the deployed Pages URL to **Supabase → Authentication → URL Configuration → Redirect URLs**. A project-pages pattern typically looks like:
-
-```text
-https://YOUR_GITHUB_USERNAME.github.io/YOUR_REPOSITORY/**
+```bash
+supabase functions deploy admin-users
+supabase functions deploy stripe-checkout
+supabase functions deploy stripe-portal
+supabase functions deploy stripe-webhook --no-verify-jwt
 ```
 
-## Serving behavior
+Set secrets:
 
-Creating a placement does not necessarily make it visible in the mobile app. It must satisfy all of the serving rules already described in `SPONSORED_RESULTS.md`:
-
-1. `active = true`
-2. `starts_at` is in the past/current time
-3. `ends_at` is null or still in the future
-4. its coordinates are inside the app's current map viewport
-
-The portal defaults new placements to inactive so an admin can review them before publishing.
-
-## Reporting
-
-The overview and each placement use the table's authoritative cumulative `impression_count`. Estimated spend is calculated as:
-
-```text
-(impression_count / 1000) * (cpm_rate_cents / 100)
+```bash
+supabase secrets set \
+  SUPABASE_SECRET_KEY=sb_secret_... \
+  STRIPE_RESTRICTED_KEY=rk_live_... \
+  STRIPE_WEBHOOK_SIGNING_SECRET=whsec_... \
+  STRIPE_PRICE_STARTER=price_... \
+  STRIPE_PRICE_GROWTH=price_... \
+  PORTAL_URL=https://sponsors.chowseek.com/
 ```
 
-For detailed day-by-day reporting, continue to aggregate `public.sponsored_result_impressions.viewed_at` as described in `SPONSORED_RESULTS.md`; this static portal does not request raw impression-audit rows.
+Prefer a Stripe restricted key with only the Customer, Checkout Session, Billing Portal, Subscription, and webhook-related permissions this portal needs.
+
+### Stripe Dashboard
+
+Create a separate Product for each plan (for example **Chowseek Starter** and **Chowseek Growth**) and a recurring Price for each. Put the Price IDs in the secrets above. Configure the Customer Portal for the plan changes/cancellation options you want customers to have.
+
+Add the deployed `stripe-webhook` URL as a Stripe webhook endpoint and subscribe to:
+
+- `checkout.session.completed`
+- `customer.subscription.created`
+- `customer.subscription.updated`
+- `customer.subscription.deleted`
+- `invoice.paid`
+- `invoice.payment_failed`
+
+The Checkout code intentionally leaves payment methods dynamic rather than hard-coding card-only payments.
+
+## Stripe Tax
+
+Do not turn on `automatic_tax` just because the portal uses Billing. First determine where Chowseek has tax obligations and configure the applicable Stripe Tax registrations. Until registrations exist, enabling automatic tax can create a false sense that tax is being collected when it is not.
+
+## Frontend build
+
+The site follows the lightweight TypeScript build style used by `chowseek.com`:
+
+```bash
+npm install
+npm run typecheck
+npm run build
+```
+
+`dist/` can still be deployed to GitHub Pages. The backend is the Supabase database + Edge Functions.
+
+## Required Supabase Auth configuration
+
+Add the production portal URL to Authentication redirect URLs so password reset and user invitations return to the portal. Customize the Invite User email template if desired.
+
+## Security notes
+
+- Never ship `SUPABASE_SECRET_KEY`, a service-role key, Stripe secret/restricted keys, or webhook secrets to the browser.
+- RLS is enabled on every new table in the exposed `public` schema.
+- Account deletion is server-only and refuses to delete a platform-admin account.
+- Removing restaurant access is usually preferable to deleting the Auth account when a user might belong to another restaurant.
+- The Stripe webhook verifies the raw request body signature and keeps an event-id table to avoid replaying the same event.
