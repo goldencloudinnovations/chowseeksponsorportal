@@ -13,7 +13,7 @@ https://ugbindlzyqaktejbxalk.supabase.co
 
 There is no separate local Supabase stack to start. `src/config.ts` contains only the hosted project's publishable browser key, so local frontend development talks to the same Chowseek Auth, Postgres/RLS, and deployed `restaurant-*` Edge Functions as production.
 
-The portal's migration has been applied to that project. Existing Chowseek consumer billing remains separate and untouched.
+The portal migrations have been applied to that project. Existing Chowseek consumer billing remains separate and untouched.
 
 ## What changed
 
@@ -28,7 +28,7 @@ The portal's migration has been applied to that project. Existing Chowseek consu
 
 ## Architecture
 
-The browser contains only the Chowseek Supabase publishable key. Normal restaurant/profile/placement CRUD is protected by Postgres RLS. Operations that require Supabase Auth Admin or Stripe credentials run in hosted Supabase Edge Functions.
+The browser contains only the Chowseek Supabase publishable key. Normal restaurant/profile/placement CRUD is protected by Postgres RLS. Privileged operations run in hosted Supabase Edge Functions using the same `@supabase/server` / `context.supabaseAdmin` pattern as Chowseek's existing functions.
 
 ### Roles
 
@@ -56,15 +56,16 @@ Because this is the live Chowseek database, use test restaurant records rather t
 
 ## Database
 
-Migration:
+These repo migrations correspond to the changes already applied to the hosted Chowseek project:
 
 ```text
 supabase/migrations/20260915120000_restaurant_portal.sql
+supabase/migrations/20260915210000_restaurant_portal_audit_index.sql
 ```
 
-It creates the tenant/RBAC tables and RLS policies and adds `restaurant_id` to the existing `public.sponsored_results` table. It also carries forward any users in the old `chowseek_private.portal_admins` allowlist.
+They create the tenant/RBAC tables and RLS policies, add `restaurant_id` to the existing `public.sponsored_results` table, preserve existing sponsored placements, and carry forward users from the old `chowseek_private.portal_admins` allowlist.
 
-If you need to bootstrap a platform admin from an existing Chowseek Auth account:
+If you need to bootstrap another platform admin from an existing Chowseek Auth account:
 
 ```sql
 insert into public.platform_admins (user_id)
@@ -83,7 +84,7 @@ restaurant-stripe-portal
 restaurant-stripe-webhook
 ```
 
-The hosted Chowseek project already provides its Supabase secret-key environment and `STRIPE_API_KEY`; the restaurant functions reuse those rather than introducing another Supabase/Stripe API key.
+All four are deployed to the existing Chowseek project. The authenticated functions use Chowseek's native `withSupabase({ auth: 'user' })` wrapper and `context.supabaseAdmin`; the webhook uses `withSupabase({ auth: 'none' })`. Restaurant Stripe functions reuse Chowseek's existing `STRIPE_API_KEY`.
 
 Restaurant-specific billing still needs these values configured in the hosted project before Checkout/webhook testing:
 
@@ -123,6 +124,7 @@ For password reset and invitations from localhost, add the localhost dev URL to 
 
 - Never ship Supabase secret/service-role keys, `STRIPE_API_KEY`, or webhook secrets to the browser.
 - RLS is enabled on every new table in the exposed `public` schema.
+- `restaurant_stripe_events` intentionally has RLS with no browser policy because it is Edge-Function-only.
 - Account deletion is server-only and refuses to delete a platform-admin account.
 - Removing restaurant access is usually preferable to deleting the Auth account when a user might belong to another restaurant.
 - Restaurant Stripe events use a separate idempotency table from Chowseek's existing consumer billing webhook.
