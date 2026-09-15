@@ -3,8 +3,8 @@ import Stripe from 'npm:stripe@22.4.0';
 import { corsHeaders, json } from '../_shared/cors.ts';
 import { requireRestaurantOwner } from '../_shared/portal_auth.ts';
 
-const stripeKey = Deno.env.get('STRIPE_API_KEY');
-if (!stripeKey) throw new Error('STRIPE_API_KEY is required.');
+const stripeKey = Deno.env.get('RESTAURANT_STRIPE_API_KEY');
+if (!stripeKey) throw new Error('RESTAURANT_STRIPE_API_KEY is required.');
 const stripe = new Stripe(stripeKey, { apiVersion: '2026-07-29.dahlia' });
 
 async function ensureRestaurantPortalConfiguration(admin: any, configuredId: string | null): Promise<string> {
