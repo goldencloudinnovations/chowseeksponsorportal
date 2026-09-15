@@ -25,6 +25,10 @@ Deno.serve(async (req) => {
     const user = await requireRestaurantOwner(req, restaurantId);
     const { data: restaurant, error } = await admin.from('restaurants').select('*').eq('id', restaurantId).single();
     if (error) throw error; if (!restaurant.active) throw new Error('This restaurant is disabled.');
+    const managedStatuses = new Set(['active','trialing','past_due','unpaid','incomplete','paused']);
+    if (restaurant.stripe_subscription_id && managedStatuses.has(String(restaurant.subscription_status ?? ''))) {
+      throw new Error('This restaurant already has a subscription. Use Manage billing to change or cancel it.');
+    }
 
     let customerId = restaurant.stripe_customer_id as string | null;
     if (!customerId) {
