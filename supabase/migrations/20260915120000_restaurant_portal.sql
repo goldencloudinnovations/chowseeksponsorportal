@@ -158,7 +158,11 @@ as $$
 declare payload jsonb; rid uuid; tid text;
 begin
   payload := case when tg_op = 'DELETE' then to_jsonb(old) else to_jsonb(new) end;
-  rid := case when tg_table_name = 'restaurants' then (payload->>'id')::uuid else nullif(payload->>'restaurant_id','')::uuid end;
+  rid := case
+    when tg_table_name = 'restaurants' and tg_op = 'DELETE' then null
+    when tg_table_name = 'restaurants' then (payload->>'id')::uuid
+    else nullif(payload->>'restaurant_id','')::uuid
+  end;
   tid := coalesce(payload->>'id', payload->>'user_id');
   insert into public.portal_audit_log(actor_user_id, restaurant_id, action, target_type, target_id, details)
   values (auth.uid(), rid, lower(tg_op), tg_table_name, tid, jsonb_build_object('row', payload));
@@ -179,6 +183,12 @@ alter table public.platform_admins enable row level security;
 alter table public.portal_audit_log enable row level security;
 alter table public.stripe_events enable row level security;
 alter table public.sponsored_results enable row level security;
+
+-- Remove the old admin-only sponsorship policies so the tenant policies below are authoritative.
+drop policy if exists "portal admins can read sponsored results" on public.sponsored_results;
+drop policy if exists "portal admins can create sponsored results" on public.sponsored_results;
+drop policy if exists "portal admins can update sponsored results" on public.sponsored_results;
+drop policy if exists "portal admins can delete unused sponsored results" on public.sponsored_results;
 
 -- Admin detection: users can only read their own admin marker.
 drop policy if exists "users read own platform admin marker" on public.platform_admins;
