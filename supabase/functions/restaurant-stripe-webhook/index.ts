@@ -9,6 +9,23 @@ const stripe = new Stripe(stripeKey, { apiVersion: '2026-07-29.dahlia' });
 const cryptoProvider = Stripe.createSubtleCryptoProvider();
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+function objectId(value: unknown): string | null {
+  if (typeof value === 'string' && value) return value;
+  if (value && typeof value === 'object') {
+    const id = (value as { id?: unknown }).id;
+    return typeof id === 'string' && id ? id : null;
+  }
+  return null;
+}
+
+function invoiceSubscriptionId(invoice: Stripe.Invoice): string | null {
+  const value = invoice as unknown as {
+    subscription?: unknown;
+    parent?: { subscription_details?: { subscription?: unknown } | null } | null;
+  };
+  return objectId(value.subscription) ?? objectId(value.parent?.subscription_details?.subscription);
+}
+
 async function syncSubscription(admin: SupabaseClient, subscription: Stripe.Subscription, expectedPriceId: string) {
   const restaurantId = subscription.metadata.restaurant_id ?? '';
   if (subscription.metadata.chowseek_product !== 'restaurant_portal' || !UUID.test(restaurantId)) return;
@@ -70,15 +87,23 @@ Deno.serve(
           const session = event.data.object as Stripe.Checkout.Session;
           if (session.metadata?.chowseek_product !== 'restaurant_portal' || !UUID.test(session.metadata?.restaurant_id ?? '')) break;
           if (session.mode === 'subscription' && session.subscription) {
-            const subscriptionId = typeof session.subscription === 'string' ? session.subscription : session.subscription.id;
+            const subscriptionId = objectId(session.subscription);
+            if (subscriptionId) {
+              const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+              await syncSubscription(admin, subscription, config.stripe_price_id);
+            }
+          }
+          break;
+        }
+        case 'invoice.paid':
+        case 'invoice.payment_failed': {
+          const subscriptionId = invoiceSubscriptionId(event.data.object as Stripe.Invoice);
+          if (subscriptionId) {
             const subscription = await stripe.subscriptions.retrieve(subscriptionId);
             await syncSubscription(admin, subscription, config.stripe_price_id);
           }
           break;
         }
-        case 'invoice.paid':
-        case 'invoice.payment_failed':
-          break;
       }
       return json({ ok: true });
     } catch (error) {
