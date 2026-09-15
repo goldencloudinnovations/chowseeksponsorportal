@@ -41,7 +41,7 @@ async function stripeGet(path: string, query: URLSearchParams) {
   return data;
 }
 
-async function stripePost(path: string, body: URLSearchParams, idempotencyKey?: string) {
+async function stripePost(path: string, body = new URLSearchParams(), idempotencyKey?: string) {
   const response = await fetch(`https://api.stripe.com${path}`, {
     method: 'POST',
     headers: stripeHeaders(idempotencyKey),
@@ -56,7 +56,10 @@ async function ensureMeter(admin: any, config: BillingConfig): Promise<BillingCo
   if (config.stripe_meter_id) return config;
 
   const meters = await stripeGet('/v1/billing/meters', new URLSearchParams({ limit: '100' }));
-  let meter = (meters.data ?? []).find((item: any) => item.event_name === config.meter_event_name && item.status !== 'inactive');
+  let meter = (meters.data ?? []).find((item: any) => item.event_name === config.meter_event_name);
+  if (meter?.status === 'inactive') {
+    meter = await stripePost(`/v1/billing/meters/${encodeURIComponent(meter.id)}/reactivate`, new URLSearchParams(), `chowseek_restaurant_meter_reactivate_${meter.id}`);
+  }
   if (!meter) {
     const body = new URLSearchParams();
     body.set('display_name', 'Chowseek Sponsored Impressions');
