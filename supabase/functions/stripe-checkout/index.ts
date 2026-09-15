@@ -34,7 +34,7 @@ Deno.serve(async (req) => {
       if (saveError) throw saveError;
     }
 
-    const portalUrl = (Deno.env.get('PORTAL_URL') ?? 'https://sponsors.chowseek.com/').replace(/\/$/, '');
+    const portalUrl = (Deno.env.get('PORTAL_URL') ?? 'https://sponsor.chowseek.com/').replace(/\/$/, '');
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       customer: customerId,
