@@ -1,8 +1,11 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.95.0';
 
 const url = Deno.env.get('SUPABASE_URL')!;
-const secret = Deno.env.get('SUPABASE_SECRET_KEY') ?? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-if (!secret) throw new Error('SUPABASE_SECRET_KEY is required.');
+const secretKeys = Deno.env.get('SUPABASE_SECRET_KEYS');
+const secret = secretKeys
+  ? JSON.parse(secretKeys)['default']
+  : Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+if (!secret) throw new Error('No hosted Supabase secret key is available.');
 
 export const admin = createClient(url, secret, { auth: { autoRefreshToken: false, persistSession: false } });
 
