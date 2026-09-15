@@ -73,9 +73,9 @@
                 <button id="save-restaurant" type="submit">Save restaurant</button>
               </form>
               <aside class="card">
-                <p class="eyebrow">ACCOUNT</p><h2>Plan & limits</h2>
-                <div class="stats"><div><strong id="stat-plan">—</strong><span>plan</span></div><div><strong id="stat-users">0 / 0</strong><span>users</span></div><div><strong id="stat-placements">0 / 0</strong><span>placements</span></div></div>
-                <p class="help">Limits are enforced in the database, not just hidden in the UI. Platform admins can raise or lower them per restaurant.</p>
+                <p class="eyebrow">ACCOUNT</p><h2>Billing & limits</h2>
+                <div class="stats"><div><strong id="stat-plan">$20 CPM</strong><span>fixed rate</span></div><div><strong id="stat-users">0 / 0</strong><span>users</span></div><div><strong id="stat-placements">0 / 0</strong><span>placements</span></div></div>
+                <p class="help">Sponsored impressions are billed at $20 per 1,000 impressions. Limits are enforced in the database.</p>
               </aside>
             </div>
           </section>
@@ -90,7 +90,7 @@
                 <label>Description<textarea id="place-description" maxlength="1500" rows="4" required></textarea></label>
                 <div class="grid two-compact"><label>Latitude<input id="place-latitude" type="number" min="-90" max="90" step="any" required /></label><label>Longitude<input id="place-longitude" type="number" min="-180" max="180" step="any" required /></label></div>
                 <div class="grid two-compact"><label>Starts at<input id="starts-at" type="datetime-local" required /></label><label>Ends at <span class="optional">optional</span><input id="ends-at" type="datetime-local" /></label></div>
-                <div class="grid two-compact"><label>CPM rate ($)<input id="cpm-rate" type="number" min="0" step="0.01" required /></label><label>Currency<input id="currency" minlength="3" maxlength="3" value="USD" required /></label></div>
+                <p class="help"><strong>Fixed billing:</strong> $20 CPM (2¢ per recorded impression), USD. The rate cannot be changed per placement.</p>
                 <label class="check-row"><input id="placement-active" type="checkbox" /><span>Placement is active</span></label>
                 <button id="save-placement" type="submit">Create placement</button>
               </form>
@@ -101,8 +101,8 @@
 
           <section id="tab-billing" class="tab-panel hidden">
             <div class="grid two-col">
-              <div class="card"><p class="eyebrow">BILLING</p><h2>Subscription</h2><div class="stats"><div><strong id="billing-status">—</strong><span>status</span></div><div><strong id="billing-plan">—</strong><span>plan</span></div><div><strong id="billing-renewal">—</strong><span>current period</span></div></div><button id="manage-billing" type="button">Manage billing</button></div>
-              <div class="card"><p class="eyebrow">PLANS</p><h2>Start a plan</h2><p class="help">Plan Price IDs are configured as Edge Function secrets, so pricing never depends on browser input. Existing subscriptions are changed through Manage billing.</p><div class="plan-actions"><button data-plan="starter" class="secondary checkout-plan" type="button">Choose Starter</button><button data-plan="growth" class="checkout-plan" type="button">Choose Growth</button></div><p class="help tax-note">Tax collection should be enabled only after the applicable Stripe Tax registrations are configured.</p></div>
+              <div class="card"><p class="eyebrow">BILLING</p><h2>Sponsored impressions</h2><div class="stats"><div><strong id="billing-status">—</strong><span>status</span></div><div><strong id="billing-plan">$20 CPM</strong><span>rate</span></div><div><strong id="billing-renewal">—</strong><span>current period</span></div></div><button id="manage-billing" type="button">Manage billing</button></div>
+              <div class="card"><p class="eyebrow">RATE</p><h2>$20 per 1,000 impressions</h2><p class="help">Stripe meters each deduplicated sponsored impression at 2¢. There are no Starter or Growth tiers.</p><div class="plan-actions"><button id="start-billing" type="button">Start sponsorship billing</button></div><p class="help tax-note">Payment details are collected securely by Stripe Checkout. Sponsored placements only serve for subscribed restaurants.</p></div>
             </div>
           </section>
 

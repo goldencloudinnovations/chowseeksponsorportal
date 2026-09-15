@@ -1,0 +1,2 @@
+create index if not exists restaurant_billing_usage_queue_restaurant_id_idx
+on chowseek_private.restaurant_billing_usage_queue(restaurant_id);

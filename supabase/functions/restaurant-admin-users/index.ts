@@ -74,7 +74,6 @@ Deno.serve(
         if (body.max_users !== undefined) updates.max_users = Math.max(1, Number(body.max_users));
         if (body.max_placements !== undefined) updates.max_placements = Math.max(0, Number(body.max_placements));
         if (body.active !== undefined) updates.active = Boolean(body.active);
-        if (body.plan_key !== undefined) updates.plan_key = String(body.plan_key);
         if (body.feature_flags !== undefined) updates.feature_flags = body.feature_flags;
         const { error } = await admin.from('restaurants').update(updates).eq('id', restaurantId);
         if (error) throw error;

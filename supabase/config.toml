@@ -2,3 +2,6 @@ project_id = "ugbindlzyqaktejbxalk"
 
 [functions.restaurant-stripe-webhook]
 verify_jwt = false
+
+[functions.restaurant-sync-usage]
+verify_jwt = false
