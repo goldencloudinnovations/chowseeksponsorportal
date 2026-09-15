@@ -29,7 +29,7 @@ Deno.serve(async (req) => {
       const restaurantId = String(body.restaurant_id ?? '');
       const role = String(body.role ?? 'viewer');
       if (!email || !restaurantId || !['owner','editor','viewer'].includes(role)) throw new Error('Invalid invitation.');
-      const redirectTo = Deno.env.get('PORTAL_URL') ?? 'https://sponsors.chowseek.com/';
+      const redirectTo = Deno.env.get('PORTAL_URL') ?? 'https://sponsor.chowseek.com/';
       const { data, error } = await admin.auth.admin.inviteUserByEmail(email, { redirectTo });
       if (error) throw error;
       if (!data.user?.id) throw new Error('Supabase did not return the invited user.');
