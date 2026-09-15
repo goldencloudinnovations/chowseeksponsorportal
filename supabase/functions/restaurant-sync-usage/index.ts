@@ -55,8 +55,8 @@ async function stripePost(path: string, body: URLSearchParams, idempotencyKey?: 
 async function ensureMeter(admin: any, config: BillingConfig): Promise<BillingConfig> {
   if (config.stripe_meter_id) return config;
 
-  const meters = await stripeGet('/v1/billing/meters', new URLSearchParams({ limit: '100', status: 'active' }));
-  let meter = (meters.data ?? []).find((item: any) => item.event_name === config.meter_event_name);
+  const meters = await stripeGet('/v1/billing/meters', new URLSearchParams({ limit: '100' }));
+  let meter = (meters.data ?? []).find((item: any) => item.event_name === config.meter_event_name && item.status !== 'inactive');
   if (!meter) {
     const body = new URLSearchParams();
     body.set('display_name', 'Chowseek Sponsored Impressions');
