@@ -6,6 +6,7 @@ import { requireRestaurantOwner } from '../_shared/portal_auth.ts';
 const stripeKey = Deno.env.get('STRIPE_API_KEY');
 if (!stripeKey) throw new Error('STRIPE_API_KEY is required.');
 const stripe = new Stripe(stripeKey, { apiVersion: '2026-07-29.dahlia' });
+const SPONSORSHIP_TERMS_VERSION = '2026-09-15-cpm20';
 
 function integrationIdentifier() {
   const suffix = Array.from(crypto.getRandomValues(new Uint8Array(8)), (n) => String.fromCharCode(97 + (n % 26))).join('');
@@ -77,6 +78,12 @@ Deno.serve(
         customer: customerId,
         payment_method_collection: 'always',
         line_items: [{ price: config.stripe_price_id }],
+        consent_collection: { terms_of_service: 'required' },
+        custom_text: {
+          terms_of_service_acceptance: {
+            message: 'I agree to recurring Chowseek sponsorship billing at $20 per 1,000 recorded sponsored impressions ($0.02 per impression) until canceled.',
+          },
+        },
         success_url: `${portalUrl}/?billing=success`,
         cancel_url: `${portalUrl}/?billing=cancelled`,
         client_reference_id: restaurantId,
@@ -84,12 +91,14 @@ Deno.serve(
           restaurant_id: restaurantId,
           plan_key: 'cpm_20',
           chowseek_product: 'restaurant_portal',
+          sponsorship_terms_version: SPONSORSHIP_TERMS_VERSION,
         },
         subscription_data: {
           metadata: {
             restaurant_id: restaurantId,
             plan_key: 'cpm_20',
             chowseek_product: 'restaurant_portal',
+            sponsorship_terms_version: SPONSORSHIP_TERMS_VERSION,
           },
         },
         integration_identifier: integrationIdentifier(),
