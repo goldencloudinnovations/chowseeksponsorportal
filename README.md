@@ -39,7 +39,7 @@ A non-legacy restaurant's sponsored placements serve only while the restaurant i
 - Existing placements are retained under an admin-only **Legacy / Unassigned** restaurant so nothing disappears during migration.
 - Platform admins can see every restaurant, adjust user/placement limits, enable/disable restaurants, invite users, remove access, and delete non-admin accounts.
 - Restaurant Stripe Billing uses hosted Checkout and Stripe Customer Portal.
-- Database triggers enforce `max_users`, `max_placements`, and the fixed $20 CPM rate even if a caller bypasses the UI.
+- Database triggers enforce `max_users` and `max_placements`; database constraints plus column privileges enforce the fixed `$20 CPM / USD` rate even if a caller bypasses the UI.
 - Audit rows are written for restaurant, membership, and sponsored-placement changes. Mobile `impression_count` updates are intentionally excluded from the portal audit trigger.
 
 ## Architecture
@@ -70,7 +70,15 @@ Because this is the live Chowseek database, use test restaurant records rather t
 
 ## Database
 
-The portal migrations create the tenant/RBAC model, billing queue/config, fixed-rate enforcement, RLS policies, and cron dispatch. Existing sponsored placements are preserved and users from the old `chowseek_private.portal_admins` allowlist are carried forward.
+The production SQL source for the single-rate billing follow-up is:
+
+```text
+supabase/restaurant_single_cpm_billing.sql
+```
+
+After production applies it, copy the same SQL into `supabase/migrations/` using the migration version actually recorded by Supabase. Do not invent a migration timestamp.
+
+The portal database changes create the tenant/RBAC model, billing queue/config, fixed-rate enforcement, RLS policies, and cron dispatch. Existing sponsored placements are preserved and users from the old `chowseek_private.portal_admins` allowlist are carried forward.
 
 The billing queue and Stripe configuration live in `chowseek_private`. Only narrowly scoped `SECURITY DEFINER` RPCs granted to `service_role` expose the operations needed by Edge Functions. The browser has no access to the queue, Stripe IDs, cron secret, or webhook secret.
 
@@ -108,7 +116,7 @@ The live Stripe account uses one product named **Chowseek Sponsored Impressions*
 - billing interval: monthly
 - lookup key: `chowseek_restaurant_cpm_20`
 
-Stripe Checkout always collects a payment method. Checkout metadata and subscription metadata contain the restaurant ID and `chowseek_product=restaurant_portal`; the webhook rejects restaurant subscription updates that do not use that exact metadata and the configured metered price.
+Stripe Checkout always collects a payment method and requires explicit acceptance of the recurring `$20 CPM` usage-billing terms. Checkout metadata and subscription metadata contain the restaurant ID and `chowseek_product=restaurant_portal`; the webhook rejects restaurant subscription updates that do not use that exact metadata and the configured metered price.
 
 ### Stripe webhook
 
