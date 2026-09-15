@@ -61,7 +61,7 @@ supabase secrets set \
   STRIPE_WEBHOOK_SIGNING_SECRET=whsec_... \
   STRIPE_PRICE_STARTER=price_... \
   STRIPE_PRICE_GROWTH=price_... \
-  PORTAL_URL=https://sponsors.chowseek.com/
+  PORTAL_URL=https://sponsor.chowseek.com/
 ```
 
 Prefer a Stripe restricted key with only the Customer, Checkout Session, Billing Portal, Subscription, and webhook-related permissions this portal needs.
