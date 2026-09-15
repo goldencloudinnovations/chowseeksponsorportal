@@ -1,0 +1,57 @@
+name: Build Pages assets
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/build-pages-assets.yml'
+      - 'src/**'
+      - 'scripts/build.mjs'
+      - 'package.json'
+      - 'tsconfig.json'
+      - 'index.html'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sponsor-portal-pages-assets
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Typecheck and build
+        run: |
+          npm run typecheck
+          npm run build
+
+      - name: Publish compiled assets to main
+        shell: bash
+        run: |
+          rm -rf assets
+          cp -R dist/assets assets
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add assets
+          if git diff --cached --quiet; then
+            echo 'Compiled assets are already current.'
+            exit 0
+          fi
+          git commit -m 'build: update Pages assets [skip ci]'
+          git push origin HEAD:main
