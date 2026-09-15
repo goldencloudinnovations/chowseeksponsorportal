@@ -1,73 +1,130 @@
-# Chowseek sponsorship portal
+# Chowseek restaurant portal
 
-This folder is a static sponsorship-admin site designed to deploy directly to GitHub Pages. It uses Supabase Auth plus the project **publishable** key in the browser; it never embeds a service-role/secret key.
+Full-stack TypeScript portal for restaurant customers and Chowseek platform administrators.
 
-The portal manages the existing `public.sponsored_results` model documented in `SPONSORED_RESULTS.md`:
+## Hosted backend
 
-- advertiser and optional campaign name
-- sponsored place/business name, address, and description
-- latitude/longitude used by the mobile map viewport query
-- start/end schedule and active switch
-- CPM rate and currency
-- impression count and calculated estimated spend
-
-Admins can create, edit, activate/pause, and delete unused placements. Once a placement has recorded impressions, the portal keeps it for reporting history instead of deleting it.
-
-## One-time database setup
-
-The sponsored-results migration intentionally keeps normal mobile clients away from direct table access. For a static GitHub Pages admin portal, run `SPONSOR_PORTAL_SETUP.sql` once in the linked Supabase project's SQL Editor.
-
-That setup grants `authenticated` table operations but protects every operation with RLS using the existing private portal-admin check:
+This portal intentionally uses the existing Chowseek Supabase project:
 
 ```text
-chowseek_private.is_portal_admin()
+ugbindlzyqaktejbxalk
+https://ugbindlzyqaktejbxalk.supabase.co
 ```
 
-This is what makes browser-side CRUD safe with the publishable key: possession of the key alone does not grant sponsorship access.
+There is no separate local Supabase stack to start. `src/config.ts` contains only the hosted project's publishable browser key, so local frontend development talks to the same Chowseek Auth, Postgres/RLS, and deployed `restaurant-*` Edge Functions as production.
 
-## Admin bootstrap
+The portal migrations have been applied to that project. Existing Chowseek consumer billing remains separate and untouched.
 
-Use the same private portal-admin allowlist as the trial portal. Choose an existing Supabase Auth account with a password, then add it from the SQL Editor if needed:
+## What changed
+
+- Restaurant users sign in with the existing Chowseek Supabase Auth and can only read their assigned restaurant(s).
+- Owners/editors can update restaurant profile data; viewers are read-only.
+- Sponsored placements are attached to `restaurant_id` and protected by tenant RLS.
+- Existing placements are retained under an admin-only **Legacy / Unassigned** restaurant so nothing disappears during migration.
+- Platform admins can see every restaurant, adjust user/placement limits, enable/disable restaurants, invite users, remove access, and delete non-admin accounts.
+- Restaurant Stripe Billing uses hosted Checkout and Stripe Customer Portal.
+- Database triggers enforce `max_users` and `max_placements` even if a caller bypasses the UI.
+- Audit rows are written for restaurant, membership, and sponsored-placement changes. Mobile `impression_count` updates are intentionally excluded from the portal audit trigger.
+
+## Architecture
+
+The browser contains only the Chowseek Supabase publishable key. Normal restaurant/profile/placement CRUD is protected by Postgres RLS. Privileged operations run in hosted Supabase Edge Functions using the same `@supabase/server` / `context.supabaseAdmin` pattern as Chowseek's existing functions.
+
+### Roles
+
+- **platform admin** — all restaurants + privileged account/limit management
+- **owner** — edit restaurant, placements, and billing
+- **editor** — edit restaurant and placements
+- **viewer** — read-only restaurant and placement access
+
+Authorization is stored in `public.platform_admins` and `public.restaurant_memberships`; it does not trust user-editable Auth metadata.
+
+## Local frontend test
+
+Clone/check out the feature branch and run:
+
+```bash
+git checkout feat/full-stack-restaurant-portal
+npm install
+npm run typecheck
+npm run dev
+```
+
+Open the localhost URL printed by the dev server. That local page uses the existing Chowseek backend directly; do not run `supabase start` or change `src/config.ts` to localhost.
+
+Because this is the live Chowseek database, use test restaurant records rather than modifying real customer data while testing.
+
+## Database
+
+These repo migrations correspond to the changes already applied to the hosted Chowseek project:
+
+```text
+supabase/migrations/20260915120000_restaurant_portal.sql
+supabase/migrations/20260915210000_restaurant_portal_audit_index.sql
+```
+
+They create the tenant/RBAC tables and RLS policies, add `restaurant_id` to the existing `public.sponsored_results` table, preserve existing sponsored placements, and carry forward users from the old `chowseek_private.portal_admins` allowlist.
+
+If you need to bootstrap another platform admin from an existing Chowseek Auth account:
 
 ```sql
-insert into chowseek_private.portal_admins (user_id)
-select id
-from auth.users
-where lower(email) = lower('YOUR_ADMIN_EMAIL@example.com')
+insert into public.platform_admins (user_id)
+select id from auth.users where lower(email) = lower('YOUR_ADMIN_EMAIL@example.com')
 on conflict (user_id) do nothing;
 ```
 
-There is intentionally no public sign-up flow in this portal.
+## Edge Functions
 
-## GitHub Pages
-
-There is no build step. Publish this directory as the Pages site root, or copy its files into a repository `docs/` directory and configure Pages to deploy that directory.
-
-The Supabase client import is pinned to `@supabase/supabase-js@2.95.0` through `esm.sh`.
-
-If password reset is used, add the deployed Pages URL to **Supabase → Authentication → URL Configuration → Redirect URLs**. A project-pages pattern typically looks like:
+The restaurant portal uses namespaced functions so it does not overwrite Chowseek's existing consumer billing functions:
 
 ```text
-https://YOUR_GITHUB_USERNAME.github.io/YOUR_REPOSITORY/**
+restaurant-admin-users
+restaurant-stripe-checkout
+restaurant-stripe-portal
+restaurant-stripe-webhook
 ```
 
-## Serving behavior
+All four are deployed to the existing Chowseek project. The authenticated functions use Chowseek's native `withSupabase({ auth: 'user' })` wrapper and `context.supabaseAdmin`; the webhook uses `withSupabase({ auth: 'none' })`. Restaurant Stripe functions reuse Chowseek's existing `STRIPE_API_KEY`.
 
-Creating a placement does not necessarily make it visible in the mobile app. It must satisfy all of the serving rules already described in `SPONSORED_RESULTS.md`:
-
-1. `active = true`
-2. `starts_at` is in the past/current time
-3. `ends_at` is null or still in the future
-4. its coordinates are inside the app's current map viewport
-
-The portal defaults new placements to inactive so an admin can review them before publishing.
-
-## Reporting
-
-The overview and each placement use the table's authoritative cumulative `impression_count`. Estimated spend is calculated as:
+Restaurant-specific billing still needs these values configured in the hosted project before Checkout/webhook testing:
 
 ```text
-(impression_count / 1000) * (cpm_rate_cents / 100)
+STRIPE_RESTAURANT_STARTER_PRICE_ID
+STRIPE_RESTAURANT_GROWTH_PRICE_ID
+RESTAURANT_STRIPE_WEBHOOK_SECRET
+PORTAL_URL=https://sponsor.chowseek.com/
 ```
 
-For detailed day-by-day reporting, continue to aggregate `public.sponsored_result_impressions.viewed_at` as described in `SPONSORED_RESULTS.md`; this static portal does not request raw impression-audit rows.
+### Stripe Dashboard
+
+Create a separate Product for each restaurant plan (for example **Chowseek Starter** and **Chowseek Growth**) and a recurring Price for each. Put those Price IDs in the restaurant-specific secrets above.
+
+Register the deployed `restaurant-stripe-webhook` as its own Stripe webhook endpoint and subscribe to:
+
+- `checkout.session.completed`
+- `customer.subscription.created`
+- `customer.subscription.updated`
+- `customer.subscription.deleted`
+- `invoice.paid`
+- `invoice.payment_failed`
+
+This endpoint is deliberately separate from Chowseek's existing consumer `stripe-webhook`.
+
+The Checkout code leaves payment methods dynamic rather than hard-coding card-only payments.
+
+## Stripe Tax
+
+Do not turn on `automatic_tax` just because the portal uses Billing. First determine where Chowseek has tax obligations and configure the applicable Stripe Tax registrations. Until registrations exist, enabling automatic tax can create a false sense that tax is being collected when it is not.
+
+## Required Supabase Auth configuration
+
+For password reset and invitations from localhost, add the localhost dev URL to the existing Chowseek project's Authentication redirect allowlist. Keep the production `https://sponsor.chowseek.com/` redirect as well.
+
+## Security notes
+
+- Never ship Supabase secret/service-role keys, `STRIPE_API_KEY`, or webhook secrets to the browser.
+- RLS is enabled on every new table in the exposed `public` schema.
+- `restaurant_stripe_events` intentionally has RLS with no browser policy because it is Edge-Function-only.
+- Account deletion is server-only and refuses to delete a platform-admin account.
+- Removing restaurant access is usually preferable to deleting the Auth account when a user might belong to another restaurant.
+- Restaurant Stripe events use a separate idempotency table from Chowseek's existing consumer billing webhook.
