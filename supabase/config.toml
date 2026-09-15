@@ -1,4 +1,4 @@
 project_id = "ugbindlzyqaktejbxalk"
 
-[functions.stripe-webhook]
+[functions.restaurant-stripe-webhook]
 verify_jwt = false
