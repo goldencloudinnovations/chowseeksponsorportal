@@ -20,8 +20,8 @@ type UsageRow = {
   stripe_customer_id: string;
 };
 
-const stripeKey = Deno.env.get('STRIPE_API_KEY');
-if (!stripeKey) throw new Error('STRIPE_API_KEY is required.');
+const stripeKey = Deno.env.get('RESTAURANT_STRIPE_API_KEY');
+if (!stripeKey) throw new Error('RESTAURANT_STRIPE_API_KEY is required.');
 const stripeAuth = `Basic ${btoa(`${stripeKey}:`)}`;
 const stripeVersion = '2026-07-29.dahlia';
 
