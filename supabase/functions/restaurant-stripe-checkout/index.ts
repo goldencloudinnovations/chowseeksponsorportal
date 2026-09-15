@@ -40,12 +40,21 @@ Deno.serve(
 
       let customerId = restaurant.stripe_customer_id as string | null;
       if (!customerId) {
-        const customer = await stripe.customers.create({
-          name: restaurant.name,
-          email: user.email ?? undefined,
-          metadata: { restaurant_id: restaurantId, chowseek_product: 'restaurant_portal' },
-        }, { idempotencyKey: `chowseek_restaurant_customer_${restaurantId}` });
-        customerId = customer.id;
+        const found = await stripe.customers.search({
+          query: `metadata['restaurant_id']:'${restaurantId}' AND metadata['chowseek_product']:'restaurant_portal'`,
+          limit: 10,
+        });
+        const existingCustomer = found.data.find((customer) => !('deleted' in customer && customer.deleted));
+        if (existingCustomer) {
+          customerId = existingCustomer.id;
+        } else {
+          const customer = await stripe.customers.create({
+            name: restaurant.name,
+            email: user.email ?? undefined,
+            metadata: { restaurant_id: restaurantId, chowseek_product: 'restaurant_portal' },
+          }, { idempotencyKey: `chowseek_restaurant_customer_${restaurantId}` });
+          customerId = customer.id;
+        }
         const { error: saveError } = await admin.from('restaurants').update({
           stripe_customer_id: customerId,
           updated_at: new Date().toISOString(),
