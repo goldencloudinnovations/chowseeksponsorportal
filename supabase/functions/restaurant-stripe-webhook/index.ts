@@ -3,8 +3,8 @@ import type { SupabaseClient } from 'npm:@supabase/supabase-js@2.95.0';
 import Stripe from 'npm:stripe@22.4.0';
 import { json } from '../_shared/cors.ts';
 
-const stripeKey = Deno.env.get('STRIPE_API_KEY');
-if (!stripeKey) throw new Error('STRIPE_API_KEY is required.');
+const stripeKey = Deno.env.get('RESTAURANT_STRIPE_API_KEY');
+if (!stripeKey) throw new Error('RESTAURANT_STRIPE_API_KEY is required.');
 const stripe = new Stripe(stripeKey, { apiVersion: '2026-07-29.dahlia' });
 const cryptoProvider = Stripe.createSubtleCryptoProvider();
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
