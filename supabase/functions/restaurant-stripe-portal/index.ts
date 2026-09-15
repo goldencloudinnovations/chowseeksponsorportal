@@ -31,8 +31,6 @@ async function ensureRestaurantPortalConfiguration(admin: any, configuredId: str
             options: ['too_expensive', 'missing_features', 'switched_service', 'unused', 'other'],
           },
         },
-        subscription_update: { enabled: false },
-        customer_update: { enabled: false, allowed_updates: [] },
       },
     });
   }
