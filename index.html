@@ -4,120 +4,174 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light" />
+    <meta name="theme-color" content="#f8f7f2" />
     <title>Chowseek Restaurant Portal</title>
     <link rel="stylesheet" href="./assets/styles.css" />
   </head>
   <body>
-    <div class="shell">
-      <header class="topbar">
-        <a class="brand" href="/"><span class="brand-mark">C</span><span>Chowseek</span></a>
-        <div class="topbar-actions">
-          <span id="session-label" class="muted"></span>
-          <button id="sign-out" class="secondary hidden" type="button">Sign out</button>
+    <div class="site-shell">
+      <header class="nav">
+        <div class="container nav-row">
+          <a class="brand" href="https://chowseek.com/" aria-label="Chowseek home">
+            <span class="brand-mark" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M5 13.5c4-1 5.8-4 6.3-8 3.6 2.3 6.2 5.2 6.7 8.5.5 3.2-1.8 5.5-5.4 5.5-4.3 0-7.6-2.1-7.6-6Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M8.4 17c2.2-2.1 4.2-4.6 5.7-7.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            </span>
+            <span>Chowseek</span>
+            <span class="brand-product">for Restaurants</span>
+          </a>
+          <div class="nav-actions">
+            <span id="session-label" class="session-label"></span>
+            <button id="sign-out" class="button button-secondary hidden" type="button">Sign out</button>
+          </div>
         </div>
       </header>
 
-      <div id="notice" class="notice hidden" role="status"></div>
+      <div class="container"><div id="notice" class="notice hidden" role="status"></div></div>
 
       <main>
-        <section id="login-view" class="auth-wrap">
-          <div class="card auth-card">
-            <p class="eyebrow">RESTAURANT PORTAL</p>
-            <h1>Manage your Chowseek presence.</h1>
-            <p class="lede">Restaurant teams see only their own profile, sponsored placements, usage limits, and billing. Platform admins can manage the whole network.</p>
-            <form id="login-form" class="stack">
-              <label>Email<input id="login-email" type="email" autocomplete="email" required /></label>
-              <label>Password<input id="login-password" type="password" autocomplete="current-password" required /></label>
-              <button id="login-button" type="submit">Sign in</button>
-            </form>
-            <button id="reset-password" class="link-button" type="button">Send password reset email</button>
-          </div>
-        </section>
-
-        <section id="password-view" class="auth-wrap hidden">
-          <div class="card auth-card">
-            <p class="eyebrow">PASSWORD</p><h1>Choose a new password.</h1>
-            <form id="password-form" class="stack">
-              <label>New password<input id="new-password" type="password" minlength="10" autocomplete="new-password" required /></label>
-              <button type="submit">Update password</button>
-            </form>
-          </div>
-        </section>
-
-        <section id="denied-view" class="auth-wrap hidden">
-          <div class="card auth-card"><p class="eyebrow">ACCESS</p><h1>No active restaurant access.</h1><p class="lede">Ask a Chowseek administrator to assign this account to a restaurant.</p></div>
-        </section>
-
-        <section id="portal-view" class="hidden">
-          <div class="hero-row">
-            <div><p class="eyebrow">DASHBOARD</p><h1 id="portal-title">Restaurant portal</h1><p id="portal-subtitle" class="lede"></p></div>
-            <div id="restaurant-switcher-wrap" class="switcher-wrap hidden"><label>Restaurant<select id="restaurant-switcher"></select></label></div>
-          </div>
-
-          <nav class="tabs" aria-label="Portal sections">
-            <button class="tab active" data-tab="restaurant" type="button">Restaurant</button>
-            <button class="tab" data-tab="placements" type="button">Sponsored placements</button>
-            <button class="tab" data-tab="billing" type="button">Billing</button>
-            <button id="admin-tab-button" class="tab hidden" data-tab="admin" type="button">Admin</button>
-          </nav>
-
-          <section id="tab-restaurant" class="tab-panel">
-            <div class="grid two-col">
-              <form id="restaurant-form" class="card stack">
-                <div class="section-heading"><div><p class="eyebrow">PROFILE</p><h2>Restaurant information</h2></div><span id="restaurant-status" class="badge"></span></div>
-                <label>Name<input id="restaurant-name" maxlength="200" required /></label>
-                <label>Address<input id="restaurant-address" maxlength="500" /></label>
-                <div class="grid two-compact"><label>Phone<input id="restaurant-phone" maxlength="40" /></label><label>Website<input id="restaurant-website" type="url" maxlength="500" /></label></div>
-                <label>Description<textarea id="restaurant-description" maxlength="2000" rows="5"></textarea></label>
-                <div class="grid two-compact"><label>Latitude<input id="restaurant-latitude" type="number" min="-90" max="90" step="any" /></label><label>Longitude<input id="restaurant-longitude" type="number" min="-180" max="180" step="any" /></label></div>
-                <button id="save-restaurant" type="submit">Save restaurant</button>
+        <section id="login-view" class="auth-section">
+          <div class="container auth-grid">
+            <div class="auth-intro">
+              <span class="eyebrow"><span class="eyebrow-dot"></span>Restaurant portal</span>
+              <h1>Your Chowseek presence, in one place.</h1>
+              <p>Update your restaurant, manage sponsored placements, track impressions, and handle billing without seeing anyone else’s account.</p>
+              <div class="trust-row"><span>One restaurant per account</span><span>$20 CPM</span><span>Stripe billing</span></div>
+            </div>
+            <div class="card auth-card">
+              <p class="kicker">Welcome back</p>
+              <h2>Sign in</h2>
+              <p class="card-copy">Use the restaurant account provided by Chowseek.</p>
+              <form id="login-form" class="stack">
+                <label>Email<input id="login-email" type="email" autocomplete="email" required /></label>
+                <label>Password<input id="login-password" type="password" autocomplete="current-password" required /></label>
+                <button id="login-button" class="button button-primary full" type="submit">Sign in</button>
               </form>
-              <aside class="card">
-                <p class="eyebrow">ACCOUNT</p><h2>Billing & limits</h2>
-                <div class="stats"><div><strong id="stat-plan">$20 CPM</strong><span>fixed rate</span></div><div><strong id="stat-users">0 / 0</strong><span>users</span></div><div><strong id="stat-placements">0 / 0</strong><span>placements</span></div></div>
-                <p class="help">Sponsored impressions are billed at $20 per 1,000 impressions. Limits are enforced in the database.</p>
-              </aside>
+              <button id="reset-password" class="text-button" type="button">Forgot your password?</button>
             </div>
-          </section>
+          </div>
+        </section>
 
-          <section id="tab-placements" class="tab-panel hidden">
-            <div class="grid two-col">
-              <form id="placement-form" class="card stack">
-                <div class="section-heading"><div><p class="eyebrow">SPONSORSHIP</p><h2 id="placement-form-title">New placement</h2></div><button id="cancel-placement-edit" class="secondary hidden" type="button">Cancel</button></div>
-                <label>Campaign name <span class="optional">optional</span><input id="campaign-name" maxlength="200" /></label>
-                <label>Display name<input id="place-name" maxlength="200" required /></label>
-                <label>Display address<input id="place-address" maxlength="500" required /></label>
-                <label>Description<textarea id="place-description" maxlength="1500" rows="4" required></textarea></label>
-                <div class="grid two-compact"><label>Latitude<input id="place-latitude" type="number" min="-90" max="90" step="any" required /></label><label>Longitude<input id="place-longitude" type="number" min="-180" max="180" step="any" required /></label></div>
-                <div class="grid two-compact"><label>Starts at<input id="starts-at" type="datetime-local" required /></label><label>Ends at <span class="optional">optional</span><input id="ends-at" type="datetime-local" /></label></div>
-                <p class="help"><strong>Fixed billing:</strong> $20 CPM (2¢ per recorded impression), USD. The rate cannot be changed per placement.</p>
-                <label class="check-row"><input id="placement-active" type="checkbox" /><span>Placement is active</span></label>
-                <button id="save-placement" type="submit">Create placement</button>
+        <section id="password-view" class="auth-section hidden">
+          <div class="container auth-grid single-card-grid">
+            <div class="auth-intro compact-intro">
+              <span class="eyebrow"><span class="eyebrow-dot"></span>Account security</span>
+              <h1 id="password-title">Change your password.</h1>
+              <p id="password-copy">Choose a password you don’t use anywhere else.</p>
+            </div>
+            <div class="card auth-card">
+              <p id="password-eyebrow" class="kicker">Account security</p>
+              <h2>Secure your account</h2>
+              <form id="password-form" class="stack">
+                <label id="current-password-wrap">Current password<input id="current-password" type="password" autocomplete="current-password" /></label>
+                <label>New password<input id="new-password" type="password" minlength="12" autocomplete="new-password" required /></label>
+                <label>Confirm new password<input id="confirm-password" type="password" minlength="12" autocomplete="new-password" required /></label>
+                <button class="button button-primary full" type="submit">Save new password</button>
+                <button id="cancel-password" class="button button-secondary full" type="button">Cancel</button>
               </form>
-              <aside class="card"><p class="eyebrow">REPORTING</p><h2>Placement totals</h2><div class="stats"><div><strong id="stat-serving">0</strong><span>serving now</span></div><div><strong id="stat-impressions">0</strong><span>impressions</span></div><div><strong id="stat-spend">$0.00</strong><span>estimated spend</span></div></div></aside>
             </div>
-            <div class="card list-card"><div class="section-heading"><div><p class="eyebrow">PLACEMENTS</p><h2>Your sponsored results</h2></div><button id="refresh-placements" class="secondary" type="button">Refresh</button></div><div id="placements-empty" class="empty hidden">No placements yet.</div><div id="placements-list" class="offer-list"></div></div>
-          </section>
+          </div>
+        </section>
 
-          <section id="tab-billing" class="tab-panel hidden">
-            <div class="grid two-col">
-              <div class="card"><p class="eyebrow">BILLING</p><h2>Sponsored impressions</h2><div class="stats"><div><strong id="billing-status">—</strong><span>status</span></div><div><strong id="billing-plan">$20 CPM</strong><span>rate</span></div><div><strong id="billing-renewal">—</strong><span>current period</span></div></div><button id="manage-billing" type="button">Manage billing</button></div>
-              <div class="card"><p class="eyebrow">RATE</p><h2>$20 per 1,000 impressions</h2><p class="help">Stripe meters each deduplicated sponsored impression at 2¢. There are no Starter or Growth tiers.</p><div class="plan-actions"><button id="start-billing" type="button">Start sponsorship billing</button></div><p class="help tax-note">Payment details are collected securely by Stripe Checkout. Sponsored placements only serve for subscribed restaurants.</p></div>
-            </div>
-          </section>
+        <section id="denied-view" class="auth-section hidden">
+          <div class="container narrow">
+            <div class="card empty-state-card"><span class="eyebrow"><span class="eyebrow-dot"></span>Access</span><h1>No restaurant assigned yet.</h1><p>Your login works, but this account does not have an active restaurant. Ask a Chowseek administrator to assign access.</p></div>
+          </div>
+        </section>
 
-          <section id="tab-admin" class="tab-panel hidden">
-            <div class="card">
-              <div class="section-heading"><div><p class="eyebrow">PLATFORM ADMIN</p><h2>Restaurants & users</h2></div><button id="refresh-admin" class="secondary" type="button">Refresh</button></div>
-              <form id="create-restaurant-form" class="admin-inline"><input id="new-restaurant-name" placeholder="New restaurant name" maxlength="200" required /><button type="submit">Add restaurant</button></form>
-              <div id="admin-restaurants" class="admin-list"></div>
+        <section id="portal-view" class="portal hidden">
+          <div class="container">
+            <div class="portal-hero">
+              <div>
+                <span class="eyebrow"><span class="eyebrow-dot"></span>Restaurant dashboard</span>
+                <h1 id="portal-title">Restaurant portal</h1>
+                <p id="portal-subtitle"></p>
+              </div>
+              <div id="restaurant-switcher-wrap" class="switcher-wrap hidden"><label>Restaurant<select id="restaurant-switcher"></select></label></div>
             </div>
-            <div class="card list-card">
-              <div class="section-heading"><div><p class="eyebrow">USERS</p><h2>Invite or limit access</h2></div></div>
-              <form id="invite-user-form" class="admin-inline"><input id="invite-email" type="email" placeholder="owner@example.com" required /><select id="invite-restaurant"></select><select id="invite-role"><option value="owner">Owner</option><option value="editor">Editor</option><option value="viewer">Viewer</option></select><button type="submit">Invite</button></form>
-              <div id="admin-users" class="admin-list"></div>
-            </div>
-          </section>
+
+            <nav class="tabs" aria-label="Portal sections">
+              <button id="restaurant-tab-button" class="tab active" data-tab="restaurant" type="button">Restaurant</button>
+              <button id="placements-tab-button" class="tab" data-tab="placements" type="button">Sponsored results</button>
+              <button id="billing-tab-button" class="tab" data-tab="billing" type="button">Billing</button>
+              <button class="tab" data-tab="account" type="button">Account</button>
+              <button id="admin-tab-button" class="tab hidden" data-tab="admin" type="button">Platform admin</button>
+            </nav>
+
+            <section id="tab-restaurant" class="tab-panel">
+              <div class="grid two-col">
+                <form id="restaurant-form" class="card stack">
+                  <div class="section-heading"><div><p class="kicker">Profile</p><h2>Restaurant information</h2><p class="card-copy">This is what Chowseek uses to represent your business.</p></div><span id="restaurant-status" class="badge"></span></div>
+                  <label>Name<input id="restaurant-name" maxlength="200" required /></label>
+                  <label>Address<input id="restaurant-address" maxlength="500" /></label>
+                  <div class="grid two-compact"><label>Phone<input id="restaurant-phone" maxlength="40" /></label><label>Website<input id="restaurant-website" type="url" maxlength="500" /></label></div>
+                  <label>Description<textarea id="restaurant-description" maxlength="2000" rows="5"></textarea></label>
+                  <div class="grid two-compact"><label>Latitude<input id="restaurant-latitude" type="number" min="-90" max="90" step="any" /></label><label>Longitude<input id="restaurant-longitude" type="number" min="-180" max="180" step="any" /></label></div>
+                  <div><button id="save-restaurant" class="button button-primary" type="submit">Save restaurant</button></div>
+                </form>
+                <aside class="card summary-card">
+                  <p class="kicker">At a glance</p><h2>Account limits</h2>
+                  <div class="stats"><div><strong id="stat-plan">$20 CPM</strong><span>fixed sponsorship rate</span></div><div><strong id="stat-users">—</strong><span>portal users</span></div><div><strong id="stat-placements">0 / 0</strong><span>sponsored results</span></div></div>
+                  <p class="help">Billing is based on deduplicated sponsored impressions. Limits are enforced by the database.</p>
+                </aside>
+              </div>
+            </section>
+
+            <section id="tab-placements" class="tab-panel hidden">
+              <div class="grid two-col">
+                <form id="placement-form" class="card stack">
+                  <div class="section-heading"><div><p class="kicker">Sponsorship</p><h2 id="placement-form-title">New sponsored result</h2><p class="card-copy">Choose exactly how your sponsored result appears in Chowseek.</p></div><button id="cancel-placement-edit" class="button button-secondary hidden" type="button">Cancel</button></div>
+                  <label>Campaign name <span class="optional">optional</span><input id="campaign-name" maxlength="200" /></label>
+                  <label>Display name<input id="place-name" maxlength="200" required /></label>
+                  <label>Display address<input id="place-address" maxlength="500" required /></label>
+                  <label>Description<textarea id="place-description" maxlength="1500" rows="4" required></textarea></label>
+                  <div class="grid two-compact"><label>Latitude<input id="place-latitude" type="number" min="-90" max="90" step="any" required /></label><label>Longitude<input id="place-longitude" type="number" min="-180" max="180" step="any" required /></label></div>
+                  <div class="grid two-compact"><label>Starts at<input id="starts-at" type="datetime-local" required /></label><label>Ends at <span class="optional">optional</span><input id="ends-at" type="datetime-local" /></label></div>
+                  <div class="rate-callout"><strong>$20 CPM</strong><span>2¢ per deduplicated impression · USD</span></div>
+                  <label class="check-row"><input id="placement-active" type="checkbox" /><span>Placement is active</span></label>
+                  <div><button id="save-placement" class="button button-primary" type="submit">Create sponsored result</button></div>
+                </form>
+                <aside class="card summary-card"><p class="kicker">Reporting</p><h2>Placement totals</h2><div class="stats"><div><strong id="stat-serving">0</strong><span>serving now</span></div><div><strong id="stat-impressions">0</strong><span>impressions</span></div><div><strong id="stat-spend">$0.00</strong><span>estimated spend</span></div></div></aside>
+              </div>
+              <div class="card list-card"><div class="section-heading"><div><p class="kicker">Sponsored results</p><h2>Your placements</h2></div><button id="refresh-placements" class="button button-secondary" type="button">Refresh</button></div><div id="placements-empty" class="empty hidden">No sponsored results yet.</div><div id="placements-list" class="offer-list"></div></div>
+            </section>
+
+            <section id="tab-billing" class="tab-panel hidden">
+              <div class="grid two-col">
+                <div class="card"><p class="kicker">Billing</p><h2>Sponsored impressions</h2><div class="stats"><div><strong id="billing-status">—</strong><span>subscription status</span></div><div><strong id="billing-plan">$20 CPM</strong><span>fixed rate</span></div><div><strong id="billing-renewal">—</strong><span>current period</span></div></div><button id="manage-billing" class="button button-primary" type="button">Manage billing</button><p id="billing-owner-note" class="help hidden">Only a restaurant owner can change billing.</p></div>
+                <div class="card accent-card"><p class="kicker">Simple usage billing</p><h2>$20 per 1,000 impressions.</h2><p>Stripe meters every accepted, deduplicated sponsored impression at 2¢. No tiers and no per-placement rate settings.</p><div class="plan-actions"><button id="start-billing" class="button button-primary" type="button">Start sponsorship billing</button></div><p class="help tax-note">Payment details are collected securely by Stripe Checkout.</p></div>
+              </div>
+            </section>
+
+            <section id="tab-account" class="tab-panel hidden">
+              <div class="grid two-col account-grid">
+                <div class="card"><p class="kicker">Account</p><h2>Sign-in details</h2><div class="stats"><div><strong id="account-email">—</strong><span>email</span></div><div><strong id="account-role">—</strong><span>access role</span></div></div><button id="change-password" class="button button-primary" type="button">Change password</button></div>
+                <div class="card"><p class="kicker">Security</p><h2>Your password stays yours.</h2><p class="card-copy">If an administrator creates or resets your password, Chowseek requires you to replace the temporary password the next time you sign in.</p></div>
+              </div>
+            </section>
+
+            <section id="tab-admin" class="tab-panel hidden">
+              <div class="admin-hero card">
+                <div><p class="kicker">Platform administration</p><h2>Restaurants and access</h2><p class="card-copy">Create restaurants and dedicated portal accounts. Restaurant users only see their assigned restaurant.</p></div><button id="refresh-admin" class="button button-secondary" type="button">Refresh users</button>
+              </div>
+              <div class="card list-card">
+                <div class="section-heading"><div><p class="kicker">Restaurants</p><h2>Restaurant accounts</h2></div></div>
+                <form id="create-restaurant-form" class="admin-inline"><input id="new-restaurant-name" placeholder="New restaurant name" maxlength="200" required /><button class="button button-primary" type="submit">Add restaurant</button></form>
+                <div id="admin-restaurants-empty" class="empty hidden">No restaurants yet. Create the first one above.</div><div id="admin-restaurants" class="admin-list"></div>
+              </div>
+              <div class="card list-card">
+                <div class="section-heading"><div><p class="kicker">Users</p><h2>Create portal account</h2><p class="card-copy">Temporary passwords must be changed by the user at first sign-in.</p></div></div>
+                <form id="create-user-form" class="admin-inline user-create-form">
+                  <input id="create-user-email" type="email" placeholder="owner@example.com" autocomplete="off" required />
+                  <input id="create-user-password" type="password" minlength="12" placeholder="Temporary password (12+ chars)" autocomplete="new-password" required />
+                  <select id="create-user-restaurant"></select>
+                  <select id="create-user-role"><option value="owner">Owner</option><option value="editor">Editor</option><option value="viewer">Viewer</option></select>
+                  <button id="create-user-submit" class="button button-primary" type="submit">Create user</button>
+                </form>
+                <p id="create-user-empty" class="help hidden">Create a restaurant before adding a user.</p>
+                <div id="admin-users-empty" class="empty hidden">No restaurant portal users yet.</div><div id="admin-users" class="admin-list"></div>
+              </div>
+            </section>
+          </div>
         </section>
       </main>
     </div>

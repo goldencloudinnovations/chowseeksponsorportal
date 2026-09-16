@@ -10,13 +10,23 @@ on:
       - 'package.json'
       - 'tsconfig.json'
       - 'index.html'
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/build-pages-assets.yml'
+      - 'src/**'
+      - 'scripts/build.mjs'
+      - 'package.json'
+      - 'tsconfig.json'
+      - 'index.html'
+      - 'supabase/**'
   workflow_dispatch:
 
 permissions:
   contents: write
 
 concurrency:
-  group: sponsor-portal-pages-assets
+  group: sponsor-portal-pages-assets-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -42,6 +52,7 @@ jobs:
           npm run build
 
       - name: Publish compiled assets to main
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         shell: bash
         run: |
           rm -rf assets
