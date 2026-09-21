@@ -8,7 +8,7 @@ const checks = [
   ['admin users load lazily', /name==='admin'&&isAdmin&&!adminUsersLoaded/.test(app)],
   ['normal users are scoped to one restaurant', /restaurantQuery=restaurantQuery\.eq\('id',memberships\[0\]\.restaurant_id\)/.test(app)],
   ['billing is owner/admin only', /function canManageBilling\(\)/.test(app)],
-  ['admin memberships prioritize active access', /sort\(\(a,b\)=>Number\(b\.active\)-Number\(a\.active\)\)/.test(admin)],
+  ['admin memberships prioritize active access', /sort\(\(a,\s*b\)\s*=>\s*Number\(b\.active\)\s*-\s*Number\(a\.active\)\)/.test(admin)],
 ];
 
 const failed = checks.filter(([, ok]) => !ok);
