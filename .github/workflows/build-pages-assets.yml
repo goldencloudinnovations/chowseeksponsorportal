@@ -6,16 +6,17 @@ on:
     paths:
       - '.github/workflows/build-pages-assets.yml'
       - 'src/**'
-      - 'scripts/build.mjs'
+      - 'scripts/**'
       - 'package.json'
       - 'tsconfig.json'
       - 'index.html'
+      - 'supabase/**'
   pull_request:
     branches: [main]
     paths:
       - '.github/workflows/build-pages-assets.yml'
       - 'src/**'
-      - 'scripts/build.mjs'
+      - 'scripts/**'
       - 'package.json'
       - 'tsconfig.json'
       - 'index.html'
@@ -45,6 +46,9 @@ jobs:
 
       - name: Install dependencies
         run: npm install --no-audit --no-fund
+
+      - name: Regression checks
+        run: node scripts/regression-check.mjs
 
       - name: Typecheck and build
         run: |
