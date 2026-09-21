@@ -51,7 +51,9 @@ Deno.serve(
           last_sign_in_at: u.last_sign_in_at,
           force_password_change: u.force_password_change,
           password_set_by_admin: u.password_set_by_admin,
-          memberships: (memberships ?? []).filter((m) => m.user_id === u.user_id),
+          memberships: (memberships ?? [])
+            .filter((m) => m.user_id === u.user_id)
+            .sort((a, b) => Number(b.active) - Number(a.active)),
         }));
         return json({ users });
       }
